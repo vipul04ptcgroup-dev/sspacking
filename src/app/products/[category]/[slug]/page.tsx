@@ -5,7 +5,7 @@ import { use } from 'react';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ShoppingCart, ChevronRight, Plus, Minus, Check, Package } from 'lucide-react';
+import { ShoppingCart, ChevronRight, Plus, Minus, Check, Package, MessageSquare } from 'lucide-react';
 import { getProductBySlug } from '@/lib/firestore';
 import type { Product, ProductVariant } from '@/types';
 import { formatPrice } from '@/lib/utils';
@@ -179,20 +179,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
           )}
 
           {/* Quantity + Add to Cart */}
+          {/* Quantity + Add to Cart + Get Quote */}
           <div className="flex items-center gap-4 mb-6">
             <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden">
-              <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-4 py-3 hover:bg-stone-100 transition text-stone-600">
+              <button disabled onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-4 py-3 hover:bg-stone-100 transition text-stone-600">
                 <Minus className="w-4 h-4" />
               </button>
               <span className="px-5 py-3 font-bold text-stone-900 min-w-[3rem] text-center">{quantity}</span>
-              <button onClick={() => setQuantity(q => q + 1)} className="px-4 py-3 hover:bg-stone-100 transition text-stone-600">
+              <button disabled onClick={() => setQuantity(q => q + 1)} className="px-4 py-3 hover:bg-stone-100 transition text-stone-600">
                 <Plus className="w-4 h-4" />
               </button>
             </div>
+
             <Button
+              disabled
               onClick={handleAddToCart}
               loading={adding}
-              disabled={!selectedVariant || selectedVariant.stock === 0}
+              // disabled={!selectedVariant || selectedVariant.stock === 0}
               size="lg"
               className="flex-1"
             >
@@ -200,19 +203,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
             </Button>
           </div>
 
+          {/* Get Quote Button */}
+          <Link
+            href={`/contact#quote?product=${encodeURIComponent(product.name)}&size=${encodeURIComponent(selectedVariant?.size || '')}&material=${encodeURIComponent(selectedVariant?.material || '')}&quantity=${quantity}`}
+            className="flex items-center justify-center gap-2 w-full border-2 border-amber-500 text-amber-600 font-bold py-3 rounded-xl hover:bg-amber-50 transition mb-6"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Get a Quote for This Product
+          </Link>
+
           {/* SKU */}
           {selectedVariant?.sku && (
             <p className="text-xs text-stone-400">SKU: {selectedVariant.sku}</p>
           )}
 
           {/* Tags */}
-          {product.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
-              {product.tags.map(tag => (
-                <span key={tag} className="bg-stone-100 text-stone-600 text-xs px-3 py-1 rounded-full">{tag}</span>
-              ))}
-            </div>
-          )}
+          {product.tags.map((tag, index) => (
+            <span key={`${tag}-${index}`} className="bg-stone-100 text-stone-600 text-xs px-3 py-1 rounded-full">
+              {tag}
+            </span>
+          ))}
         </div>
       </div>
     </div>

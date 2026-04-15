@@ -70,6 +70,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
             <div className="flex gap-2">
               <button
+              disabled
                 onClick={handleAddToCart}
                 className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition shadow-lg"
               >

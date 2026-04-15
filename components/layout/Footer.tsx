@@ -75,15 +75,17 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5 text-sm text-stone-400">
                 <MapPin className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                123, Industrial Area, Mumbai, Maharashtra - 400001
+                Office no. 201-202, Hirubhai Residency
+Besides Vedant Hospital, Virar (West) - 401303
+Maharashtra, India.
               </li>
               <li className="flex items-center gap-2.5 text-sm text-stone-400">
                 <Phone className="w-4 h-4 text-amber-500 shrink-0" />
-                <a href="tel:+919876543210" className="hover:text-amber-400 transition">+91 98765 43210</a>
+                <a href="tel:+919876543210" className="hover:text-amber-400 transition">+91 91208 79879</a>
               </li>
               <li className="flex items-center gap-2.5 text-sm text-stone-400">
                 <Mail className="w-4 h-4 text-amber-500 shrink-0" />
-                <a href="mailto:info@sspackaging.in" className="hover:text-amber-400 transition">info@sspackaging.in</a>
+                <a href="mailto:ptcvirar@gmail.com" className="hover:text-amber-400 transition">ptcvirar@gmail.com</a>
               </li>
             </ul>
             <div className="mt-5 p-3 bg-stone-800 rounded-xl">

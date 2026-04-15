@@ -63,9 +63,9 @@ export default function ContactPage() {
           <div>
             <h2 className="text-xl font-black text-stone-900 mb-6">Contact Information</h2>
             {[
-              { icon: Phone, label: 'Phone', value: '+91 98765 43210', href: 'tel:+919876543210' },
-              { icon: Mail, label: 'Email', value: 'info@sspackaging.in', href: 'mailto:info@sspackaging.in' },
-              { icon: MapPin, label: 'Address', value: '123 Industrial Area, Mumbai, Maharashtra 400001' },
+              { icon: Phone, label: 'Phone', value: '+91 91208 79879', href: 'tel:+919876543210' },
+              { icon: Mail, label: 'Email', value: 'ptcvirar@gmail.com', href: 'mailto:ptcvirar@gmail.com' },
+              { icon: MapPin, label: 'Address', value: 'Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra, India.' },
               { icon: Clock, label: 'Hours', value: 'Mon – Sat: 9:00 AM – 6:00 PM' },
             ].map(item => (
               <div key={item.label} className="flex items-start gap-4 mb-5">
@@ -108,7 +108,7 @@ export default function ContactPage() {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid sm:grid-cols-2 gap-4">
                     <Input label="Full Name *" id="name" placeholder="John Doe" error={errors.name?.message} {...register('name')} />
-                    <Input label="Phone *" id="phone" placeholder="+91 98765 43210" error={errors.phone?.message} {...register('phone')} />
+                    <Input label="Phone *" id="phone" placeholder="+91 91208 79879" error={errors.phone?.message} {...register('phone')} />
                     <Input label="Email *" id="email" type="email" placeholder="you@company.com" error={errors.email?.message} {...register('email')} />
                     <Input label="Company (Optional)" id="company" placeholder="Your Company Ltd" {...register('company')} />
                     <Input label="Product Interest *" id="productInterest" placeholder="e.g. Bamboo Bottles, Glass Jars" error={errors.productInterest?.message} {...register('productInterest')} className="sm:col-span-2" />

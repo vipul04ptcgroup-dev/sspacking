@@ -106,7 +106,7 @@ export default function CheckoutPage() {
               <h2 className="text-lg font-bold text-stone-900 mb-5">Shipping Information</h2>
               <div className="grid sm:grid-cols-2 gap-4">
                 <Input label="Full Name" id="fullName" placeholder="John Doe" error={errors.fullName?.message} {...register('fullName')} />
-                <Input label="Phone Number" id="phone" placeholder="+91 98765 43210" error={errors.phone?.message} {...register('phone')} />
+                <Input label="Phone Number" id="phone" placeholder="+91 91208 79879" error={errors.phone?.message} {...register('phone')} />
                 <Input label="Email" id="email" type="email" placeholder="you@email.com" error={errors.email?.message} {...register('email')} className="sm:col-span-2" />
                 <Input label="Address Line 1" id="addressLine1" placeholder="House/Flat No, Street, Area" error={errors.addressLine1?.message} {...register('addressLine1')} className="sm:col-span-2" />
                 <Input label="Address Line 2 (Optional)" id="addressLine2" placeholder="Landmark, etc." {...register('addressLine2')} className="sm:col-span-2" />

@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(user, { displayName: name });
     await createUserProfile(user.uid, {
-      email, displayName: name, role: 'customer', addresses: [],
+      email, displayName: name, role: 'customer', addresses: ['Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra, India.'],
     } as any);
   };
 

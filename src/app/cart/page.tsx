@@ -97,7 +97,7 @@ export default function CartPage() {
               </div>
             </div>
             <Link href="/checkout" className="block mt-6">
-              <Button size="lg" className="w-full">
+              <Button size="lg" className="w-full" disabled>
                 Proceed to Checkout <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
