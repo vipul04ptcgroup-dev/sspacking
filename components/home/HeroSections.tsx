@@ -12,7 +12,7 @@ export function HeroBanner() {
         <svg width="100%" height="100%">
           <defs>
             <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1"/>
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
@@ -65,14 +65,29 @@ export function HeroBanner() {
           <div className="relative w-full max-w-lg aspect-square">
             <div className="absolute inset-0 bg-amber-600/20 rounded-3xl backdrop-blur-sm border border-amber-500/20 flex items-center justify-center">
               <div className="text-center text-amber-300/50">
-                <svg className="w-32 h-32 mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <svg
+                  className="w-48 h-48 mx-auto mb-4"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  {/* Bottle silhouette with smoother curves */}
+                  <path d="M11 2h2v2.2c0 .6.3 1.2.7 1.6l1 1c.4.4.6.9.6 1.5v9.8c0 2-1.5 3.5-3.5 3.5h-1.6C8.2 21.6 6.7 20 6.7 18V8.3c0-.6.2-1.1.6-1.5l1-1c.4-.4.7-1 .7-1.6V2h2z" />
+
+                  {/* Inner subtle cut for premium depth */}
+                  <path
+                    d="M9.5 8.5v9.5c0 1.2.8 2 2 2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="0.5"
+                    opacity="0.25"
+                  />
                 </svg>
-                <p className="text-lg font-semibold">Add hero image</p>
+                {/* <p className="text-lg font-semibold">Add hero image</p> */}
               </div>
             </div>
           </div>
         </div>
+
       </div>
     </section>
   );
