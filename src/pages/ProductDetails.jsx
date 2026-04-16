@@ -1,122 +1,82 @@
 import { useState } from "react";
-import { useDispatch } from "react-redux";
-import { useParams } from "react-router-dom";
-import { addToCart } from "../redux/cartSlice";
 
-// Dummy product (later from API)
 const product = {
-    _id: "1",
-    name: "Bottle",
-    image: "https://via.placeholder.com/300",
-    variants: [
-        { size: "250ml", material: "Plastic", price: 20, stock: 10 },
-        { size: "250ml", material: "Glass", price: 30, stock: 5 },
-        { size: "500ml", material: "Plastic", price: 25, stock: 8 },
-        { size: "500ml", material: "Glass", price: 40, stock: 2 },
-    ],
+  _id: "1",
+  name: "Bottle",
+  image: "https://via.placeholder.com/300",
+  variants: [
+    { size: "250ml", material: "Plastic", price: 20, stock: 10 },
+    { size: "250ml", material: "Glass", price: 30, stock: 5 },
+    { size: "500ml", material: "Plastic", price: 25, stock: 8 },
+    { size: "500ml", material: "Glass", price: 40, stock: 2 },
+  ],
 };
 
 const ProductDetails = () => {
-    const { id } = useParams();
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedMaterial, setSelectedMaterial] = useState("");
 
-    const dispatch = useDispatch();
+  const sizes = [...new Set(product.variants.map((variant) => variant.size))];
+  const materials = [...new Set(product.variants.map((variant) => variant.material))];
 
-    const [selectedSize, setSelectedSize] = useState("");
-    const [selectedMaterial, setSelectedMaterial] = useState("");
+  const selectedVariant = product.variants.find(
+    (variant) => variant.size === selectedSize && variant.material === selectedMaterial,
+  );
 
-    // Extract unique sizes & materials
-    const sizes = [...new Set(product.variants.map(v => v.size))];
-    const materials = [...new Set(product.variants.map(v => v.material))];
+  return (
+    <div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-2">
+      <img src={product.image} alt={product.name} className="w-full rounded-xl" />
 
-    // Find selected variant
-    const selectedVariant = product.variants.find(
-        (v) => v.size === selectedSize && v.material === selectedMaterial
-    );
+      <div>
+        <h1 className="text-2xl font-bold">{product.name}</h1>
 
-    return (
-        <div className="max-w-5xl mx-auto grid grid-cols-2 gap-10">
-
-            {/* Image */}
-            <img
-                src={product.image}
-                alt={product.name}
-                className="w-full rounded-xl"
-            />
-
-            {/* Info */}
-            <div>
-                <h1 className="text-2xl font-bold">{product.name}</h1>
-
-                {/* Size Selector */}
-                <div className="mt-4">
-                    <h3 className="font-semibold">Select Size</h3>
-                    <div className="flex gap-3 mt-2">
-                        {sizes.map((size) => (
-                            <button
-                                key={size}
-                                onClick={() => setSelectedSize(size)}
-                                className={`px-4 py-2 border rounded ${selectedSize === size ? "bg-blue-600 text-white" : ""
-                                    }`}
-                            >
-                                {size}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Material Selector */}
-                <div className="mt-4">
-                    <h3 className="font-semibold">Select Material</h3>
-                    <div className="flex gap-3 mt-2">
-                        {materials.map((mat) => (
-                            <button
-                                key={mat}
-                                onClick={() => setSelectedMaterial(mat)}
-                                className={`px-4 py-2 border rounded ${selectedMaterial === mat ? "bg-blue-600 text-white" : ""
-                                    }`}
-                            >
-                                {mat}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Price */}
-                <div className="mt-6">
-                    <p className="text-xl font-bold text-blue-600">
-                        {selectedVariant ? `₹${selectedVariant.price}` : "Select options"}
-                    </p>
-
-                    {/* Stock */}
-                    {selectedVariant && (
-                        <p className="text-sm text-gray-500">
-                            Stock: {selectedVariant.stock}
-                        </p>
-                    )}
-                </div>
-
-                {/* Add to Cart */}
-                <button
-                    disabled={!selectedVariant}
-                    onClick={() =>
-                        dispatch(
-                            addToCart({
-                                productId: product._id,
-                                name: product.name,
-                                image: product.image,
-                                price: selectedVariant.price,
-                                size: selectedVariant.size,
-                                material: selectedVariant.material,
-                            })
-                        )
-                    }
-                className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg disabled:bg-gray-400"
-                >
-                Add to Cart
-            </button>
+        <div className="mt-4">
+          <h3 className="font-semibold">Select Size</h3>
+          <div className="mt-2 flex gap-3">
+            {sizes.map((size) => (
+              <button
+                key={size}
+                onClick={() => setSelectedSize(size)}
+                className={`rounded border px-4 py-2 ${selectedSize === size ? "bg-blue-600 text-white" : ""}`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
         </div>
-        </div >
-    );
+
+        <div className="mt-4">
+          <h3 className="font-semibold">Select Material</h3>
+          <div className="mt-2 flex gap-3">
+            {materials.map((material) => (
+              <button
+                key={material}
+                onClick={() => setSelectedMaterial(material)}
+                className={`rounded border px-4 py-2 ${selectedMaterial === material ? "bg-blue-600 text-white" : ""}`}
+              >
+                {material}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <p className="text-xl font-bold text-blue-600">
+            {selectedVariant ? `Rs. ${selectedVariant.price}` : "Select options"}
+          </p>
+
+          {selectedVariant && <p className="text-sm text-gray-500">Stock: {selectedVariant.stock}</p>}
+        </div>
+
+        <button
+          disabled={!selectedVariant}
+          className="mt-6 w-full rounded-lg bg-blue-600 py-3 text-white disabled:bg-gray-400"
+        >
+          Add to Cart
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default ProductDetails;
