@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getProducts, getCategories } from '@/lib/firestore';
 import type { Product, Category } from '@/types';
 import ProductGrid from '@/components/product/ProductGrid';
 import { SlidersHorizontal, X } from 'lucide-react';
 
-export default function ProductsPage() {
+function ProductsContent() {
   const searchParams = useSearchParams();
   const q = searchParams?.get('q') || '';
   const [products, setProducts] = useState<Product[]>([]);
@@ -111,5 +111,13 @@ export default function ProductsPage() {
 
       <ProductGrid products={filtered} loading={loading} />
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10" />}>
+      <ProductsContent />
+    </Suspense>
   );
 }
