@@ -20,7 +20,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     getProductById(id).then(p => { setProduct(p); setLoading(false); });
   }, [id]);
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     await updateProduct(id, data);
     toast.success('Product updated!');
     router.push('/admin/products');

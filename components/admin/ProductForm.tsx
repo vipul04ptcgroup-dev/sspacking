@@ -42,7 +42,7 @@ type FormData = z.infer<typeof schema>;
 
 interface ProductFormProps {
   initialData?: Product;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: Record<string, unknown>) => Promise<void>;
   productId?: string;
 }
 
@@ -58,7 +58,7 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
   useEffect(() => { getAllCategories().then(setCategories); }, []);
 
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema) as any,
+    resolver: zodResolver(schema),
     defaultValues: initialData
       ? { ...initialData, tags: initialData.tags.join(', '), featured: initialData.featured, active: initialData.active }
       : { active: true, featured: false, variants: [newVariant()] },

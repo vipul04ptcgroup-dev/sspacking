@@ -1,7 +1,6 @@
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, startAfter, DocumentSnapshot,
-  serverTimestamp, Timestamp, writeBatch, increment
+  query, where, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Product, Category, Order, User, QuoteRequest, OrderStatus } from '@/types';

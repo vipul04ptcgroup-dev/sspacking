@@ -47,21 +47,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, name: string) => {
-    const { user } = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(user, { displayName: name });
-    await createUserProfile(user.uid, {
-      email, displayName: name, role: 'customer', addresses: ['Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra, India.'],
-    } as any);
+    const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(newUser, { displayName: name });
+    await createUserProfile(newUser.uid, {
+      email,
+      displayName: name,
+      role: 'customer',
+      addresses: [],
+    });
   };
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    const { user } = await signInWithPopup(auth, provider);
-    const existing = await getUserProfile(user.uid);
+    const { user: googleUser } = await signInWithPopup(auth, provider);
+    const existing = await getUserProfile(googleUser.uid);
     if (!existing) {
-      await createUserProfile(user.uid, {
-        email: user.email!, displayName: user.displayName || '', role: 'customer', addresses: [],
-      } as any);
+      await createUserProfile(googleUser.uid, {
+        email: googleUser.email ?? '',
+        displayName: googleUser.displayName ?? '',
+        role: 'customer',
+        addresses: [],
+      });
     }
   };
 

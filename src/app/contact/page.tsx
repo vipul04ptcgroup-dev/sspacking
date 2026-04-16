@@ -28,7 +28,7 @@ export default function ContactPage() {
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>({
-    resolver: zodResolver(schema) as any,
+    resolver: zodResolver(schema),
   });
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {

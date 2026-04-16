@@ -10,7 +10,7 @@ import { ChevronRight } from 'lucide-react';
 export default function NewProductPage() {
   const router = useRouter();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     await createProduct(data);
     toast.success('Product created!');
     router.push('/admin/products');

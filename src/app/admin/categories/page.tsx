@@ -39,7 +39,7 @@ export default function AdminCategoriesPage() {
         await updateCategory(editing.id, form);
         toast.success('Category updated!');
       } else {
-        await createCategory(form as any);
+        await createCategory(form as Omit<Category, 'id'>);
         toast.success('Category created!');
       }
       setModalOpen(false);

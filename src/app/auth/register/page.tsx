@@ -39,8 +39,9 @@ export default function RegisterPage() {
       await registerUser(data.email, data.password, data.name);
       toast.success('Account created successfully!');
       router.push(redirect);
-    } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') toast.error('Email already in use');
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === 'auth/email-already-in-use') toast.error('Email already in use');
       else toast.error('Registration failed. Please try again.');
     } finally { setLoading(false); }
   };
