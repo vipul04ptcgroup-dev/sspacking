@@ -6,11 +6,14 @@ import ProductForm from '@/components/admin/ProductForm';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+import type { Product } from '@/types';
+
+type ProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
 
 export default function NewProductPage() {
   const router = useRouter();
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = async (data: ProductPayload) => {
     await createProduct(data);
     toast.success('Product created!');
     router.push('/admin/products');

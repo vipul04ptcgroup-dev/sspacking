@@ -22,7 +22,7 @@ export default function LoginPage() {
   const { login, loginWithGoogle } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/';
+  const redirect = searchParams?.get('redirect') || '/';
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 

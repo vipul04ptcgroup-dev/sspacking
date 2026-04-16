@@ -22,16 +22,18 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
+type FormInput = z.input<typeof schema>;
+type FormOutput = z.output<typeof schema>;
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(schema),
   });
 
-  const onSubmit: SubmitHandler<FormData> = async (data) => {
+  const onSubmit: SubmitHandler<FormOutput> = async (data) => {
     setLoading(true);
     try {
       await createQuoteRequest({

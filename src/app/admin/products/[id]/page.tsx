@@ -10,6 +10,8 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
+type ProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -20,7 +22,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     getProductById(id).then(p => { setProduct(p); setLoading(false); });
   }, [id]);
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = async (data: ProductPayload) => {
     await updateProduct(id, data);
     toast.success('Product updated!');
     router.push('/admin/products');

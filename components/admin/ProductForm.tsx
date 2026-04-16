@@ -38,11 +38,13 @@ const schema = z.object({
   variants: z.array(variantSchema).min(1, 'At least one variant required'),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormInput = z.input<typeof schema>;
+type FormOutput = z.output<typeof schema>;
+type ProductFormValues = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface ProductFormProps {
   initialData?: Product;
-  onSubmit: (data: Record<string, unknown>) => Promise<void>;
+  onSubmit: (data: ProductFormValues) => Promise<void>;
   productId?: string;
 }
 
@@ -57,7 +59,7 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
 
   useEffect(() => { getAllCategories().then(setCategories); }, []);
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(schema),
     defaultValues: initialData
       ? { ...initialData, tags: initialData.tags.join(', '), featured: initialData.featured, active: initialData.active }
@@ -87,7 +89,7 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
     finally { setUploading(false); }
   };
 
-  const handleFormSubmit: SubmitHandler<FormData> = async (data) => {
+  const handleFormSubmit: SubmitHandler<FormOutput> = async (data) => {
     setSaving(true);
     try {
       const tags = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];

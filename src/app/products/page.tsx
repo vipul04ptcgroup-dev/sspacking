@@ -9,7 +9,7 @@ import { SlidersHorizontal, X } from 'lucide-react';
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
-  const q = searchParams.get('q') || '';
+  const q = searchParams?.get('q') || '';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
