@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { getAllCategories, createCategory, updateCategory, deleteCategory } from '@/lib/firestore';
+import { uploadCategoryImage } from '@/lib/storage';
 import type { Category } from '@/types';
 import { slugify } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { Textarea, Modal, EmptyState } from '@/components/ui';
 import { Spinner } from '@/components/ui';
-import { Plus, Pencil, Trash2, Tags } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tags, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Image from 'next/image';
 
 const emptyForm = { name: '', slug: '', description: '', image: '', order: 0, active: true };
 
@@ -20,6 +22,7 @@ export default function AdminCategoriesPage() {
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const load = async () => { setCategories(await getAllCategories()); setLoading(false); };
   useEffect(() => { load(); }, []);
@@ -33,6 +36,7 @@ export default function AdminCategoriesPage() {
 
   const handleSave = async () => {
     if (!form.name) { toast.error('Name is required'); return; }
+    if (uploading) { toast.error('Please wait for the image upload to finish'); return; }
     setSaving(true);
     try {
       if (editing) {
@@ -53,6 +57,24 @@ export default function AdminCategoriesPage() {
     await deleteCategory(id);
     toast.success('Category deleted');
     load();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const categoryId = editing?.id || `temp_${Date.now()}`;
+      const image = await uploadCategoryImage(file, categoryId);
+      setForm(f => ({ ...f, image }));
+      toast.success(editing ? 'Category image updated!' : 'Category image uploaded!');
+    } catch {
+      toast.error('Image upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -114,14 +136,46 @@ export default function AdminCategoriesPage() {
           <Input label="Category Name *" id="cat-name" value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Bamboo Packaging" />
           <Input label="Slug" id="cat-slug" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="auto-generated" />
           <Textarea label="Description" id="cat-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief category description" />
-          <Input label="Image URL" id="cat-image" value={form.image} onChange={e => setForm(f => ({ ...f, image: e.target.value }))} placeholder="https://..." />
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-stone-700">Category Image</p>
+              <p className="text-xs text-stone-500 mt-1">Upload a category image instead of pasting an image URL.</p>
+            </div>
+            {form.image ? (
+              <div className="relative w-full h-44 rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group">
+                <Image src={form.image} alt={form.name || 'Category image'} fill className="object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, image: '' }))}
+                  className="absolute top-2 right-2 w-8 h-8 bg-black/65 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                  aria-label="Remove category image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex h-36 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 text-stone-400 transition hover:border-amber-400 hover:text-amber-600">
+                <Upload className="w-6 h-6 mb-2" />
+                <span className="text-sm font-medium">{uploading ? 'Uploading...' : 'Upload Image'}</span>
+                <span className="text-xs mt-1">PNG, JPG, or WebP</span>
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+              </label>
+            )}
+            {form.image && (
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-400 hover:text-amber-600">
+                <Upload className="w-4 h-4" />
+                <span>{uploading ? 'Uploading...' : 'Replace Image'}</span>
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+              </label>
+            )}
+          </div>
           <Input label="Display Order" id="cat-order" type="number" value={form.order} onChange={e => setForm(f => ({ ...f, order: Number(e.target.value) }))} />
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} className="w-4 h-4 accent-amber-600" />
             <span className="text-sm font-medium text-stone-700">Active (Visible on store)</span>
           </label>
           <div className="flex gap-3 pt-2">
-            <Button onClick={handleSave} loading={saving} className="flex-1">
+            <Button onClick={handleSave} loading={saving || uploading} className="flex-1">
               {editing ? 'Update' : 'Create'}
             </Button>
             <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>

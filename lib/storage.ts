@@ -18,6 +18,6 @@ export async function uploadCategoryImage(file: File, categoryId: string): Promi
 }
 
 export async function deleteImage(url: string): Promise<void> {
-  const storageRef = ref(storage, url);
+  const storageRef = ref(storage, decodeURIComponent(url.split('/o/')[1].split('?')[0]));
   await deleteObject(storageRef);
 }

@@ -35,7 +35,7 @@ const schema = z.object({
   tags: z.string().optional(),
   featured: z.boolean(),
   active: z.boolean(),
-  variants: z.array(variantSchema).min(1, 'At least one variant required'),
+  variants: z.array(variantSchema).optional(),
 });
 
 type FormInput = z.input<typeof schema>;
@@ -56,6 +56,9 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
   const [images, setImages] = useState<string[]>(initialData?.images || []);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [hasVariants, setHasVariants] = useState(
+    (initialData?.variants?.length || 0) > 0
+  );
 
   useEffect(() => { getAllCategories().then(setCategories); }, []);
 
@@ -63,7 +66,7 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
     resolver: zodResolver(schema),
     defaultValues: initialData
       ? { ...initialData, tags: initialData.tags.join(', '), featured: initialData.featured, active: initialData.active }
-      : { active: true, featured: false, variants: [newVariant()] },
+      : { active: true, featured: false, variants: [] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
@@ -74,15 +77,15 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
   }, [nameValue, initialData, setValue]);
 
   const categoryId = watch('categoryId');
-  const selectedCategory = categories.find(c => c.id === categoryId);
-
+  const selectedCategory = categories.find(c => c.id === categoryId) || null;
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setUploading(true);
     try {
-      const id = productId || `temp_${Date.now()}`;
+      const id = productId || 'new_product';
       const urls = await Promise.all(files.map(f => uploadProductImage(f, id)));
+      console.log('Uploaded:', urls); // 👈 DEBUG
       setImages(prev => [...prev, ...urls]);
       toast.success('Images uploaded!');
     } catch { toast.error('Image upload failed'); }
@@ -93,7 +96,13 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
     setSaving(true);
     try {
       const tags = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
-      await onSubmit({ ...data, tags, images, categoryName: selectedCategory?.name || '' });
+      await onSubmit({
+        ...data,
+        tags,
+        images,
+        categoryName: selectedCategory?.name || '',
+        variants: hasVariants ? data.variants || [] : [],
+      });
     } catch { toast.error('Failed to save product'); }
     finally { setSaving(false); }
   };
@@ -153,42 +162,87 @@ export default function ProductForm({ initialData, onSubmit, productId }: Produc
         <p className="text-xs text-stone-400">Upload product images (JPEG, PNG, WebP recommended)</p>
       </div>
 
-      {/* Variants */}
+      {/* Variants Toggle */}
       <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-lg font-bold text-stone-900">Variants</h2>
-            <p className="text-xs text-stone-500 mt-0.5">Define sizes, materials, pricing and stock for each variant</p>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => append(newVariant())}>
-            <Plus className="w-3.5 h-3.5" /> Add Variant
-          </Button>
-        </div>
+        <label className="flex items-center gap-2 mb-4">
+          <input
+            type="checkbox"
+            checked={hasVariants}
+            onChange={(e) => setHasVariants(e.target.checked)}
+          />
+          <span className="text-sm font-medium">This product has variants</span>
+        </label>
 
-        <div className="space-y-4">
-          {fields.map((field, index) => (
-            <div key={field.id} className="border border-stone-200 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-stone-700">Variant {index + 1}</span>
-                {fields.length > 1 && (
-                  <button type="button" onClick={() => remove(index)} className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+        {hasVariants && (
+          <>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-bold text-stone-900">Variants</h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Define sizes, materials, pricing and stock
+                </p>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <Input label="Size *" placeholder="e.g. 100ml, 250ml" error={errors.variants?.[index]?.size?.message} {...register(`variants.${index}.size`)} />
-                <Input label="Material *" placeholder="e.g. Bamboo, Glass" error={errors.variants?.[index]?.material?.message} {...register(`variants.${index}.material`)} />
-                <Input label="SKU *" placeholder="e.g. BB-100-BAM" error={errors.variants?.[index]?.sku?.message} {...register(`variants.${index}.sku`)} />
-                <Input label="Price (₹) *" type="number" min="0" error={errors.variants?.[index]?.price?.message} {...register(`variants.${index}.price`)} />
-                <Input label="Compare Price (₹)" type="number" min="0" placeholder="Original price" {...register(`variants.${index}.comparePrice`)} />
-                <Input label="Stock *" type="number" min="0" error={errors.variants?.[index]?.stock?.message} {...register(`variants.${index}.stock`)} />
-              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => append(newVariant())}>
+                <Plus className="w-3.5 h-3.5" /> Add Variant
+              </Button>
             </div>
-          ))}
-        </div>
-        {errors.variants?.root && (
-          <p className="text-xs text-red-600 mt-2">{errors.variants.root.message}</p>
+
+            <div className="space-y-4">
+              {fields.map((field, index) => (
+                <div key={field.id} className="border border-stone-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-semibold text-stone-700">
+                      Variant {index + 1}
+                    </span>
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <Input
+                      label="Size *"
+                      {...register(`variants.${index}.size`)}
+                      error={errors.variants?.[index]?.size?.message}
+                    />
+                    <Input
+                      label="Material *"
+                      {...register(`variants.${index}.material`)}
+                      error={errors.variants?.[index]?.material?.message}
+                    />
+                    <Input
+                      label="SKU *"
+                      {...register(`variants.${index}.sku`)}
+                      error={errors.variants?.[index]?.sku?.message}
+                    />
+                    <Input
+                      label="Price *"
+                      type="number"
+                      {...register(`variants.${index}.price`)}
+                      error={errors.variants?.[index]?.price?.message}
+                    />
+                    <Input
+                      label="Compare Price"
+                      type="number"
+                      {...register(`variants.${index}.comparePrice`)}
+                    />
+                    <Input
+                      label="Stock *"
+                      type="number"
+                      {...register(`variants.${index}.stock`)}
+                      error={errors.variants?.[index]?.stock?.message}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
