@@ -115,7 +115,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
         <div>
           <p className="text-amber-600 font-semibold text-sm uppercase tracking-wide mb-2">{product.categoryName}</p>
           <h1 className="text-3xl font-black text-stone-900 mb-4 leading-tight">{product.name}</h1>
-          <p className="text-stone-600 leading-relaxed mb-6">{product.description}</p>
+          {/* Short Description (just below title) */}
+          {product.shortDescription && (
+            <p className="text-stone-500 text-sm mb-4 leading-relaxed">
+              {product.shortDescription}
+            </p>
+          )}
 
           {/* Price */}
           {selectedVariant && (
@@ -223,8 +228,36 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
               {tag}
             </span>
           ))}
+
         </div>
       </div>
+
+
+      {/* Full Description Section */}
+      <div className="mt-10">
+        <div className="bg-stone-50 rounded-2xl p-6 sm:p-10 border border-amber-200">
+
+          {/* Heading */}
+          <h2 className="text-2xl sm:text-3xl font-black text-amber-600 mb-6">
+            Product Description
+          </h2>
+
+          {/* Content */}
+          <div className="space-y-4 text-black leading-relaxed text-base">
+            {product.description?.trim() ? (
+              product.description.split('\n').map((line, i) => (
+                <p key={i}>{line}</p>
+              ))
+            ) : (
+              <p>No description available for this product.</p>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+
+
     </div>
   );
 }

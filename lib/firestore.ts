@@ -83,7 +83,23 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const data = snap.docs[0].data();
-  return { id: snap.docs[0].id, ...data, createdAt: data.createdAt?.toDate?.() ?? new Date(), updatedAt: data.updatedAt?.toDate?.() ?? new Date() } as Product;
+
+return {
+  id: snap.docs[0].id,
+  name: data.name || '',
+  slug: data.slug || '',
+  description: data.description || '', // ✅ FIXED
+  shortDescription: data.shortDescription || '',
+  categoryId: data.categoryId || '',
+  categoryName: data.categoryName || '',
+  images: data.images || [],
+  variants: data.variants || [],
+  tags: data.tags || [],
+  featured: data.featured || false,
+  active: data.active || false,
+  createdAt: data.createdAt?.toDate?.() ?? new Date(),
+  updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
+} as Product;
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
