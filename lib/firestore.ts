@@ -70,12 +70,40 @@ export async function getAllProducts(): Promise<Product[]> {
 }
 
 export async function getFeaturedProducts(): Promise<Product[]> {
-  const q = query(collection(db, 'products'), where('active', '==', true), where('featured', '==', true), limit(8));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => {
-    const data = d.data();
-    return { id: d.id, ...data, createdAt: data.createdAt?.toDate?.() ?? new Date(), updatedAt: data.updatedAt?.toDate?.() ?? new Date() } as Product;
-  });
+  try {
+    const q = query(
+      collection(db, 'products'),
+      where('active', '==', true),
+      where('featured', '==', true),
+      limit(8)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.() ?? new Date(),
+        updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
+      } as Product;
+    });
+  } catch {
+    // Fallback for cases where the compound Firestore index is missing.
+    const activeQ = query(collection(db, 'products'), where('active', '==', true), limit(50));
+    const snap = await getDocs(activeQ);
+    return snap.docs
+      .map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          createdAt: data.createdAt?.toDate?.() ?? new Date(),
+          updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
+        } as Product;
+      })
+      .filter(p => p.featured)
+      .slice(0, 8);
+  }
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {

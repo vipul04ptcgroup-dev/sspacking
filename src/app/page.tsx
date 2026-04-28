@@ -3,6 +3,8 @@ import { HeroBanner, FeaturesSection, CTASection } from '@/components/home/HeroS
 import FeaturedProducts from '@/components/home/FeaturedProducts';
 import CategoryGrid from '@/components/home/CategoryGrid';
 
+export const dynamic = 'force-dynamic';
+
 export default function HomePage() {
   return (
     <>

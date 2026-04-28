@@ -3,13 +3,15 @@ import './globals.css';
 import { AuthProvider } from '@/context/auth-context';
 import { Toaster } from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
+import ConditionalFooter from '@/components/layout/ConditionalFooter';
 
 export const metadata: Metadata = {
   title: { default: 'SS Packaging — Premium Packaging Solutions', template: '%s | SS Packaging' },
   description: "India's trusted source for bamboo, glass, plastic, and eco-friendly packaging products.",
   icons: {
-    icon: '/favicon.png',
+    icon: [{ url: '/favicon.png', type: 'image/png' }],
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
   },
 };
 
@@ -20,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <Navbar />
           <main className="min-h-screen">{children}</main>
-          <Footer />
+          <ConditionalFooter />
           <Toaster
             position="top-right"
             toastOptions={{
