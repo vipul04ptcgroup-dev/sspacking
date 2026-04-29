@@ -70,7 +70,7 @@ export default function OrdersPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-stone-900 line-clamp-1">{item.productName}</p>
-                        <p className="text-xs text-stone-500">{item.size} · {item.material} · Qty: {item.quantity}</p>
+                        <p className="text-xs text-stone-500">{item.variantLabel} � Qty: {item.quantity}</p>
                       </div>
                       <p className="text-sm font-bold text-stone-700 shrink-0">{formatPrice(item.price * item.quantity)}</p>
                     </div>

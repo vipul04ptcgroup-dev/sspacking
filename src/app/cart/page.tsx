@@ -46,10 +46,10 @@ export default function CartPage() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <Link href={`/products/${item.categoryId}/${item.slug}`} className="font-bold text-stone-900 hover:text-amber-700 text-sm leading-snug line-clamp-2">
+                <Link href={`/products/${item.category}/${item.slug}`} className="font-bold text-stone-900 hover:text-amber-700 text-sm leading-snug line-clamp-2">
                   {item.productName}
                 </Link>
-                <p className="text-xs text-stone-500 mt-0.5">{item.size} · {item.material}</p>
+                <p className="text-xs text-stone-500 mt-0.5">{item.variantLabel}</p>
                 <p className="text-base font-black text-stone-900 mt-1">{formatPrice(item.price)}</p>
                 <div className="flex items-center justify-between mt-3">
                   <div className="flex items-center border border-stone-200 rounded-lg overflow-hidden">

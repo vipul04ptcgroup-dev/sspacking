@@ -31,20 +31,20 @@ function ProductsContent() {
     const lq = q.toLowerCase();
     filtered = filtered.filter(p =>
       p.name.toLowerCase().includes(lq) ||
-      p.description.toLowerCase().includes(lq) ||
+      p.shortDescription.toLowerCase().includes(lq) ||
       p.tags.some(t => t.toLowerCase().includes(lq)) ||
-      p.categoryName.toLowerCase().includes(lq)
+      p.category.toLowerCase().includes(lq)
     );
   }
 
   if (selectedCategory) {
-    filtered = filtered.filter(p => p.categoryId === selectedCategory);
+    filtered = filtered.filter(p => p.category === selectedCategory);
   }
 
   if (sortBy === 'price-asc') {
-    filtered = [...filtered].sort((a, b) => Math.min(...a.variants.map(v => v.price)) - Math.min(...b.variants.map(v => v.price)));
+    filtered = [...filtered].sort((a, b) => Math.min(...a.variants.map(v => v.price ?? Number.MAX_SAFE_INTEGER)) - Math.min(...b.variants.map(v => v.price ?? Number.MAX_SAFE_INTEGER)));
   } else if (sortBy === 'price-desc') {
-    filtered = [...filtered].sort((a, b) => Math.min(...b.variants.map(v => v.price)) - Math.min(...a.variants.map(v => v.price)));
+    filtered = [...filtered].sort((a, b) => Math.min(...b.variants.map(v => v.price ?? -1)) - Math.min(...a.variants.map(v => v.price ?? -1)));
   } else if (sortBy === 'name') {
     filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -78,8 +78,8 @@ function ProductsContent() {
         {categories.map(cat => (
           <button
             key={cat.id}
-            onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${selectedCategory === cat.id ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
+            onClick={() => setSelectedCategory(cat.slug === selectedCategory ? '' : cat.slug)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${selectedCategory === cat.slug ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
           >
             {cat.name}
           </button>

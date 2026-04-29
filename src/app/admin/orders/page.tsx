@@ -100,7 +100,7 @@ export default function AdminOrdersPage() {
                       <div className="space-y-2">
                         {order.items.map((item, i) => (
                           <div key={i} className="flex justify-between text-sm">
-                            <span className="text-stone-700">{item.productName} <span className="text-stone-400">({item.size}, {item.material}) ×{item.quantity}</span></span>
+                            <span className="text-stone-700">{item.productName} <span className="text-stone-400">({item.variantLabel}) ×{item.quantity}</span></span>
                             <span className="font-semibold">{formatPrice(item.price * item.quantity)}</span>
                           </div>
                         ))}

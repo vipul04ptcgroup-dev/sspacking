@@ -20,7 +20,7 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
     getCategoryBySlug(categorySlug).then(async cat => {
       if (!cat) { setNotFoundFlag(true); return; }
       setCategory(cat);
-      const prods = await getProducts(cat.id);
+      const prods = await getProducts(cat.slug);
       setProducts(prods);
       setLoading(false);
     });

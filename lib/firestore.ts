@@ -5,6 +5,39 @@ import {
 import { db } from './firebase';
 import type { Product, Category, Order, User, QuoteRequest, OrderStatus } from '@/types';
 
+function normalizeProduct(id: string, data: Record<string, unknown>): Product {
+  const variants = (Array.isArray(data.variants) ? data.variants : []).map((v: any) => ({
+    id: v?.id || Math.random().toString(36).slice(2),
+    images: Array.isArray(v?.images) ? v.images : [],
+    capacity: v?.capacity || v?.size || undefined,
+    neckSize: v?.neckSize || undefined,
+    material: v?.material || undefined,
+    height: v?.height || undefined,
+    weight: v?.weight || undefined,
+    packagingSize: v?.packagingSize || undefined,
+    color: v?.color || undefined,
+    sku: v?.sku || undefined,
+    price: typeof v?.price === 'number' ? v.price : undefined,
+    remark: v?.remark || undefined,
+  }));
+
+  return {
+    id,
+    name: (data.name as string) || '',
+    slug: (data.slug as string) || '',
+    shortDescription: (data.shortDescription as string) || '',
+    category: (data.category as string) || (data.categoryId as string) || '',
+    images: Array.isArray(data.images) ? (data.images as string[]) : [],
+    variants,
+    tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
+    featured: Boolean(data.featured),
+    active: Boolean(data.active),
+    hasVariants: typeof data.hasVariants === 'boolean' ? data.hasVariants : variants.length > 0,
+    createdAt: (data.createdAt as any)?.toDate?.() ?? new Date(),
+    updatedAt: (data.updatedAt as any)?.toDate?.() ?? new Date(),
+  };
+}
+
 // ─── Categories ───────────────────────────────────────────────────────────────
 
 export async function getCategories(): Promise<Category[]> {
@@ -44,29 +77,18 @@ export async function deleteCategory(id: string): Promise<void> {
 export async function getProducts(categoryId?: string): Promise<Product[]> {
   let q;
   if (categoryId) {
-    q = query(collection(db, 'products'), where('active', '==', true), where('categoryId', '==', categoryId));
+    q = query(collection(db, 'products'), where('active', '==', true), where('category', '==', categoryId));
   } else {
     q = query(collection(db, 'products'), where('active', '==', true));
   }
   const snap = await getDocs(q);
-  return snap.docs.map(d => {
-    const data = d.data();
-    return {
-      id: d.id,
-      ...data,
-      createdAt: data.createdAt?.toDate?.() ?? new Date(),
-      updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
-    } as Product;
-  });
+  return snap.docs.map(d => normalizeProduct(d.id, d.data()));
 }
 
 export async function getAllProducts(): Promise<Product[]> {
   const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
-  return snap.docs.map(d => {
-    const data = d.data();
-    return { id: d.id, ...data, createdAt: data.createdAt?.toDate?.() ?? new Date(), updatedAt: data.updatedAt?.toDate?.() ?? new Date() } as Product;
-  });
+  return snap.docs.map(d => normalizeProduct(d.id, d.data()));
 }
 
 export async function getFeaturedProducts(): Promise<Product[]> {
@@ -78,29 +100,13 @@ export async function getFeaturedProducts(): Promise<Product[]> {
       limit(8)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        ...data,
-        createdAt: data.createdAt?.toDate?.() ?? new Date(),
-        updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
-      } as Product;
-    });
+    return snap.docs.map(d => normalizeProduct(d.id, d.data()));
   } catch {
     // Fallback for cases where the compound Firestore index is missing.
     const activeQ = query(collection(db, 'products'), where('active', '==', true), limit(50));
     const snap = await getDocs(activeQ);
     return snap.docs
-      .map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          ...data,
-          createdAt: data.createdAt?.toDate?.() ?? new Date(),
-          updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
-        } as Product;
-      })
+      .map(d => normalizeProduct(d.id, d.data()))
       .filter(p => p.featured)
       .slice(0, 8);
   }
@@ -110,31 +116,13 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   const q = query(collection(db, 'products'), where('slug', '==', slug), where('active', '==', true));
   const snap = await getDocs(q);
   if (snap.empty) return null;
-  const data = snap.docs[0].data();
-
-return {
-  id: snap.docs[0].id,
-  name: data.name || '',
-  slug: data.slug || '',
-  description: data.description || '', // ✅ FIXED
-  shortDescription: data.shortDescription || '',
-  categoryId: data.categoryId || '',
-  categoryName: data.categoryName || '',
-  images: data.images || [],
-  variants: data.variants || [],
-  tags: data.tags || [],
-  featured: data.featured || false,
-  active: data.active || false,
-  createdAt: data.createdAt?.toDate?.() ?? new Date(),
-  updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
-} as Product;
+  return normalizeProduct(snap.docs[0].id, snap.docs[0].data());
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
   const snap = await getDoc(doc(db, 'products', id));
   if (!snap.exists()) return null;
-  const data = snap.data();
-  return { id: snap.id, ...data, createdAt: data.createdAt?.toDate?.() ?? new Date(), updatedAt: data.updatedAt?.toDate?.() ?? new Date() } as Product;
+  return normalizeProduct(snap.id, snap.data());
 }
 
 export async function createProduct(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {

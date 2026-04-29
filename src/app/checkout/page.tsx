@@ -62,7 +62,7 @@ export default function CheckoutPage() {
         items: items.map(i => ({
           productId: i.productId, productName: i.productName,
           productImage: i.productImage, variantId: i.variantId,
-          size: i.size, material: i.material, price: i.price, quantity: i.quantity,
+          variantLabel: i.variantLabel, sku: i.sku, price: i.price, quantity: i.quantity,
         })),
         shippingAddress: {
           fullName: data.fullName, phone: data.phone,
@@ -142,7 +142,7 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-stone-900 line-clamp-2">{item.productName}</p>
-                      <p className="text-xs text-stone-500">{item.size} · {item.material}</p>
+                      <p className="text-xs text-stone-500">{item.variantLabel}</p>
                       <p className="text-xs font-bold text-stone-900">{formatPrice(item.price)} × {item.quantity}</p>
                     </div>
                   </div>

@@ -1,26 +1,30 @@
 export interface ProductVariant {
-  id: string;
-  size: string;
-  material: string;
-  price: number;
-  comparePrice?: number;
-  stock: number;
-  sku: string;
+  id?: string;
+  images?: string[];
+  capacity?: string;
+  neckSize?: string;
+  material?: string;
+  height?: string;
+  weight?: string;
+  packagingSize?: string;
+  color?: string;
+  sku?: string;
+  price?: number;
+  remark?: string;
 }
 
 export interface Product {
   id: string;
   name: string;
   slug: string;
-  description: string;
   shortDescription: string;
-  categoryId: string;
-  categoryName: string;
-  images: string[];
+  category: string;
+  images?: string[];
   variants: ProductVariant[];
   tags: string[];
   featured: boolean;
   active: boolean;
+  hasVariants: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,12 +44,12 @@ export interface CartItem {
   productName: string;
   productImage: string;
   variantId: string;
-  size: string;
-  material: string;
+  variantLabel: string;
+  sku: string;
   price: number;
   quantity: number;
   slug: string;
-  categoryId: string;
+  category: string;
 }
 
 export interface Address {
@@ -64,8 +68,8 @@ export interface OrderItem {
   productName: string;
   productImage: string;
   variantId: string;
-  size: string;
-  material: string;
+  variantLabel: string;
+  sku: string;
   price: number;
   quantity: number;
 }

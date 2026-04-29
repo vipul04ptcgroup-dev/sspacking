@@ -39,7 +39,7 @@ export default function AdminProductsPage() {
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.categoryName.toLowerCase().includes(search.toLowerCase())
+    p.category.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -84,14 +84,17 @@ export default function AdminProductsPage() {
               </thead>
               <tbody className="divide-y divide-stone-50">
                 {filtered.map(product => {
-                  const minPrice = Math.min(...product.variants.map(v => v.price));
+                  const variants = Array.isArray(product.variants) ? product.variants : [];
+                  const pricedVariants = variants.filter(v => typeof v.price === 'number');
+                  const minPrice = pricedVariants.length ? Math.min(...pricedVariants.map(v => v.price as number)) : 0;
+                  const thumbnail = product.images?.[0] || variants.find(v => Array.isArray(v.images) && v.images[0])?.images?.[0];
                   return (
                     <tr key={product.id} className="hover:bg-stone-50 transition">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 shrink-0">
-                            {product.images[0] ? (
-                              <Image src={product.images[0]} alt={product.name} width={40} height={40} className="object-cover w-full h-full" />
+                            {thumbnail ? (
+                              <Image src={thumbnail} alt={product.name} width={40} height={40} className="object-cover w-full h-full" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center"><Package className="w-5 h-5 text-stone-300" /></div>
                             )}
@@ -102,9 +105,9 @@ export default function AdminProductsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{product.categoryName}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{product.category}</td>
                       <td className="px-4 py-3 text-sm font-bold text-stone-900">{formatPrice(minPrice)}</td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{product.variants.length}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{variants.length}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${product.active ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-stone-500'}`}>
                           {product.active ? 'Active' : 'Hidden'}

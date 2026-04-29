@@ -39,7 +39,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         <span className="text-stone-900 font-medium">{product.name}</span>
       </nav>
       <h1 className="text-3xl font-black text-stone-900 mb-8">Edit Product</h1>
-      <ProductForm initialData={product} onSubmit={handleSubmit} productId={id} />
+      <ProductForm initialData={product} onSubmit={handleSubmit} />
     </div>
   );
 }
