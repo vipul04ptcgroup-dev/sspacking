@@ -16,7 +16,7 @@ export default function NewProductPage() {
   const handleSubmit = async (data: ProductPayload) => {
     await createProduct(data);
     toast.success('Product created!');
-    router.push('/admin/products');
+    router.push('/admin/products', { scroll: true });
   };
 
   return (

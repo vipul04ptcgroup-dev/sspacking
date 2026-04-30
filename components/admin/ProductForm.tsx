@@ -325,7 +325,7 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
         <Button type="submit" loading={saving} size="lg" disabled={uploadingCommon || uploadingVariant !== null}>
           {saving ? 'Saving...' : initialData ? 'Update Product' : 'Create Product'}
         </Button>
-        <Button type="button" variant="ghost" onClick={() => router.push('/admin/products')}>Cancel</Button>
+        <Button type="button" variant="ghost" onClick={() => router.push('/admin/products', { scroll: true })}>Cancel</Button>
       </div>
     </form>
   );

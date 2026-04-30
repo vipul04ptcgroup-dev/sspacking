@@ -25,7 +25,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const handleSubmit = async (data: ProductPayload) => {
     await updateProduct(id, data);
     toast.success('Product updated!');
-    router.push('/admin/products');
+    router.push('/admin/products', { scroll: true });
   };
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;

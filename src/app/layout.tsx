@@ -4,6 +4,7 @@ import { AuthProvider } from '@/context/auth-context';
 import { Toaster } from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import ConditionalFooter from '@/components/layout/ConditionalFooter';
+import ScrollToTop from '@/components/layout/ScrollToTop';
 
 export const metadata: Metadata = {
   title: { default: 'SS Packaging — Premium Packaging Solutions', template: '%s | SS Packaging' },
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="bg-stone-50 text-stone-900 antialiased font-sans">
         <AuthProvider>
+          <ScrollToTop />
           <Navbar />
           <main className="min-h-screen">{children}</main>
           <ConditionalFooter />
