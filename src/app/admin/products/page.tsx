@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getAllProducts, deleteProduct, updateProduct } from '@/lib/firestore';
-import type { Product } from '@/types';
+import { getAllProducts, deleteProduct, updateProduct, getAllCategories } from '@/lib/firestore';
+import type { Product, Category } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import { Spinner, EmptyState } from '@/components/ui';
@@ -13,12 +13,16 @@ import toast from 'react-hot-toast';
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const load = async () => {
-    const p = await getAllProducts();
+    const [p, c] = await Promise.all([getAllProducts(), getAllCategories()]);
     setProducts(p);
+    setCategories(c);
     setLoading(false);
   };
 
@@ -37,9 +41,24 @@ export default function AdminProductsPage() {
     load();
   };
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
+  const filtered = products.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.category.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && p.active) ||
+      (statusFilter === 'inactive' && !p.active);
+
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  const categoryOptions = Array.from(
+    new Set([
+      ...categories.map((category) => category.slug),
+      ...products.map((product) => product.category),
+    ].filter(Boolean))
   );
 
   return (
@@ -54,14 +73,38 @@ export default function AdminProductsPage() {
         </Link>
       </div>
 
-      {/* Search */}
-      <div className="mb-5">
+      {/* Filters */}
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search products..."
-          className="w-full max-w-sm px-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+          className="w-full md:max-w-sm px-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
         />
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="w-full md:w-56 px-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+        >
+          <option value="all">All Categories</option>
+          {categoryOptions.map((categoryValue) => {
+            const matchedCategory = categories.find((category) => category.slug === categoryValue);
+            return (
+              <option key={categoryValue} value={categoryValue}>
+                {matchedCategory?.name || categoryValue}
+              </option>
+            );
+          })}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+          className="w-full md:w-48 px-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
       {loading ? (
