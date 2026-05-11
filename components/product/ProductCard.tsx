@@ -11,9 +11,11 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const lowestVariant = product.variants
-    .filter(v => typeof v.price === 'number')
-    .reduce((min, v) => (v.price as number) < (min.price as number) ? v : min, product.variants.find(v => typeof v.price === 'number') || product.variants[0]);
+  const pricedVariants = product.variants.filter(v => typeof v.price === 'number' && v.price > 0);
+  const hasPrice = pricedVariants.length > 0;
+  const lowestVariant = hasPrice
+    ? pricedVariants.reduce((min, v) => (v.price as number) < (min.price as number) ? v : min, pricedVariants[0])
+    : product.variants[0];
 
   const previewImage = lowestVariant?.images?.[0] || product.images?.[0] || '';
 
@@ -55,11 +57,16 @@ export default function ProductCard({ product }: ProductCardProps) {
 
           <div className="flex items-center justify-between">
             <div>
-              {lowestVariant?.price !== undefined && (
+              {hasPrice && lowestVariant?.price !== undefined && (
                 <span className="text-base font-black text-stone-900">{formatPrice(lowestVariant.price)}</span>
               )}
               <p className="text-[10px] text-stone-400 mt-0.5">{product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}</p>
             </div>
+            {!hasPrice && (
+              <span className="inline-flex items-center rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-bold text-amber-600">
+                Enquiry
+              </span>
+            )}
           </div>
         </div>
       </div>

@@ -33,6 +33,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
 
   const selectedVariant: ProductVariant | null = product.variants[selectedVariantIndex] || null;
   const images = selectedVariant?.images?.length ? selectedVariant.images : (product.images || []);
+  const hasSelectedVariantPrice = typeof selectedVariant?.price === 'number' && selectedVariant.price > 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -81,7 +82,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
             </div>
           )}
 
-          {selectedVariant?.price !== undefined && <p className="text-3xl font-black text-stone-900 mb-4">{formatPrice(selectedVariant.price)}</p>}
+          {hasSelectedVariantPrice && <p className="text-3xl font-black text-stone-900 mb-4">{formatPrice(selectedVariant.price)}</p>}
 
           {selectedVariant && (
             <div className="grid grid-cols-2 gap-3 text-sm text-stone-600 mb-6">
@@ -97,13 +98,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
             </div>
           )}
 
-          <Link
-            href={`/contact#quote?product=${encodeURIComponent(product.name)}&variant=${encodeURIComponent(selectedVariant?.capacity || '')}&variantId=${encodeURIComponent(selectedVariant?.id || '')}`}
-            className="flex items-center justify-center gap-2 w-full border-2 border-amber-500 text-amber-600 font-bold py-3 rounded-xl hover:bg-amber-50 transition mb-6"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Get a Quote for This Product
-          </Link>
+          {!hasSelectedVariantPrice && (
+            <Link
+              href={`/contact#quote?product=${encodeURIComponent(product.name)}&variant=${encodeURIComponent(selectedVariant?.capacity || '')}&variantId=${encodeURIComponent(selectedVariant?.id || '')}`}
+              className="flex items-center justify-center gap-2 w-full border-2 border-amber-500 text-amber-600 font-bold py-3 rounded-xl hover:bg-amber-50 transition mb-6"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Enquiry for This Product
+            </Link>
+          )}
 
           <div className="flex flex-wrap gap-2">
             {product.tags.map((tag, index) => (
