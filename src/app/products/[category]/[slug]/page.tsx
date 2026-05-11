@@ -82,7 +82,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
             </div>
           )}
 
-          {hasSelectedVariantPrice && <p className="text-3xl font-black text-stone-900 mb-4">{formatPrice(selectedVariant.price)}</p>}
+          {hasSelectedVariantPrice && <p className="text-3xl font-black text-stone-900 mb-4">{formatPrice(selectedVariant!.price!)}</p>}
 
           {selectedVariant && (
             <div className="grid grid-cols-2 gap-3 text-sm text-stone-600 mb-6">
