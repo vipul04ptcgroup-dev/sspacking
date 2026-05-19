@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
@@ -28,6 +28,7 @@ function parsePrice(value: string | number | undefined): number | undefined {
 }
 
 async function uploadImageFromUrl(imageUrl: string, productSlug: string): Promise<string> {
+  const { adminStorage } = getFirebaseAdmin();
   const response = await fetch(imageUrl);
   if (!response.ok) {
     throw new Error(`Image download failed with status ${response.status}`);
@@ -57,6 +58,7 @@ async function uploadImageFromUrl(imageUrl: string, productSlug: string): Promis
 
 export async function POST(request: Request) {
   try {
+    const { adminDb } = getFirebaseAdmin();
     const formData = await request.formData();
     const file = formData.get('file');
 
