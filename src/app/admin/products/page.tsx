@@ -63,15 +63,29 @@ export default function AdminProductsPage() {
         body: formData,
       });
 
-      const result = await response.json();
+      const result = (await response.json()) as {
+        error?: string;
+        imported?: number;
+        failed?: number;
+        errors?: string[];
+      };
       if (!response.ok) {
-        throw new Error(result?.error || 'Import failed');
+        const firstError = result?.errors?.[0];
+        throw new Error(firstError || result?.error || 'Import failed');
       }
 
       const imported = Number(result?.imported || 0);
       const failed = Number(result?.failed || 0);
+      const firstError = result?.errors?.[0];
 
-      toast.success(`Imported ${imported} product(s)${failed ? `, ${failed} issue(s)` : ''}`);
+      if (imported === 0) {
+        throw new Error(firstError || 'Import failed. No products were saved.');
+      }
+
+      toast.success(`Imported ${imported} product(s)`);
+      if (failed > 0) {
+        toast.error(`Skipped ${failed} row(s). ${firstError || 'Check JSON data and permissions.'}`);
+      }
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Import failed');

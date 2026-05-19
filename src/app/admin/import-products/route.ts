@@ -155,6 +155,18 @@ export async function POST(request: Request) {
       }
     }
 
+    if (imported === 0 && errors.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Import failed. No products were saved.',
+          imported,
+          failed: errors.length,
+          errors,
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json({
       imported,
       failed: errors.length,
