@@ -18,6 +18,17 @@ type ImportProduct = {
   image_url?: string;
 };
 
+function asTrimmedString(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
+}
+
 function parsePrice(value: string | number | undefined): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
@@ -77,19 +88,27 @@ export async function POST(request: Request) {
     const errors: string[] = [];
 
     for (let index = 0; index < parsed.length; index += 1) {
-      const raw = parsed[index] as ImportProduct;
-      const productName = raw.product_name?.trim();
+      const row = parsed[index];
+      if (!row || typeof row !== 'object' || Array.isArray(row)) {
+        errors.push(`Row ${index + 1}: row must be a product object.`);
+        continue;
+      }
+
+      const raw = row as ImportProduct;
+      const productName = asTrimmedString(raw.product_name);
 
       if (!productName) {
         errors.push(`Row ${index + 1}: product_name is required.`);
         continue;
       }
 
-      const category = raw.category?.trim() || 'uncategorized';
-      const description = raw.description?.trim() || '';
+      const category = asTrimmedString(raw.category) || 'uncategorized';
+      const description = asTrimmedString(raw.description) || '';
       const slug = slugify(productName) || `product-${Date.now()}-${index + 1}`;
       const price = parsePrice(raw.price);
-      const imageSource = raw.image_url?.trim() || raw.image_path?.trim();
+      const imageSource = asTrimmedString(raw.image_url) || asTrimmedString(raw.image_path);
+      const sku = asTrimmedString(raw.sku) || '';
+      const size = asTrimmedString(raw.size) || '';
 
       let imageUrl: string | null = null;
       if (imageSource) {
@@ -111,8 +130,8 @@ export async function POST(request: Request) {
         variants: [
           {
             id: randomUUID(),
-            sku: raw.sku?.trim() || '',
-            capacity: raw.size?.trim() || undefined,
+            sku,
+            capacity: size || undefined,
             price,
           },
         ],
@@ -120,9 +139,9 @@ export async function POST(request: Request) {
         featured: false,
         active: true,
         hasVariants: true,
-        sku: raw.sku?.trim() || '',
+        sku,
         price: price ?? null,
-        size: raw.size?.trim() || '',
+        size,
         sourceImage: imageSource || '',
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
