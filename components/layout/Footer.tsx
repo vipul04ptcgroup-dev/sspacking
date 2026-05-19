@@ -73,7 +73,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Categories from backend */}
+          {/* Categories from backend
           <div>
             <h4 className="text-white font-semibold mb-4">Categories</h4>
             {loadingCategories ? (
@@ -98,7 +98,7 @@ export default function Footer() {
                 ))}
               </ul>
             )}
-          </div>
+          </div> */}
 
           {/* Contact */}
           <div>
