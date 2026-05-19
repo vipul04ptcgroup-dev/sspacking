@@ -121,33 +121,38 @@ export async function POST(request: Request) {
         }
       }
 
-      await adminDb.collection('products').add({
-        name: productName,
-        slug,
-        shortDescription: description || `${productName} - ${category}`,
-        category,
-        images: imageUrl ? [imageUrl] : [],
-        variants: [
-          {
-            id: randomUUID(),
-            sku,
-            capacity: size || undefined,
-            price,
-          },
-        ],
-        tags: [],
-        featured: false,
-        active: true,
-        hasVariants: true,
-        sku,
-        price: price ?? null,
-        size,
-        sourceImage: imageSource || '',
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      try {
+        await adminDb.collection('products').add({
+          name: productName,
+          slug,
+          shortDescription: description || `${productName} - ${category}`,
+          category,
+          images: imageUrl ? [imageUrl] : [],
+          variants: [
+            {
+              id: randomUUID(),
+              sku,
+              capacity: size || undefined,
+              price,
+            },
+          ],
+          tags: [],
+          featured: false,
+          active: true,
+          hasVariants: true,
+          sku,
+          price: price ?? null,
+          size,
+          sourceImage: imageSource || '',
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
 
-      imported += 1;
+        imported += 1;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown Firestore error';
+        errors.push(`Row ${index + 1}: failed to save product (${message}).`);
+      }
     }
 
     return NextResponse.json({
