@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getAllProducts, deleteProduct, updateProduct, getAllCategories } from '@/lib/firestore';
@@ -8,7 +8,7 @@ import type { Product, Category } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import { Spinner, EmptyState } from '@/components/ui';
-import { Plus, Pencil, Trash2, Package, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Eye, EyeOff, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AdminProductsPage() {
@@ -18,6 +18,8 @@ export default function AdminProductsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     const [p, c] = await Promise.all([getAllProducts(), getAllCategories()]);
@@ -39,6 +41,44 @@ export default function AdminProductsPage() {
     await updateProduct(product.id, { active: !product.active });
     toast.success(`Product ${product.active ? 'hidden' : 'shown'}`);
     load();
+  };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      toast.error('Please select a .json file');
+      event.target.value = '';
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/admin/import-products', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || 'Import failed');
+      }
+
+      const imported = Number(result?.imported || 0);
+      const failed = Number(result?.failed || 0);
+
+      toast.success(`Imported ${imported} product(s)${failed ? `, ${failed} issue(s)` : ''}`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Import failed');
+    } finally {
+      setImporting(false);
+      event.target.value = '';
+    }
   };
 
   const filtered = products.filter((p) => {
@@ -68,9 +108,27 @@ export default function AdminProductsPage() {
           <h1 className="text-3xl font-black text-stone-900">Products</h1>
           <p className="text-stone-500 mt-1">{products.length} total products</p>
         </div>
-        <Link href="/admin/products/new">
-          <Button><Plus className="w-4 h-4" /> Add Product</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportFile}
+            disabled={importing}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="w-4 h-4" /> {importing ? 'Importing...' : 'Upload JSON'}
+          </Button>
+          <Link href="/admin/products/new">
+            <Button><Plus className="w-4 h-4" /> Add Product</Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
