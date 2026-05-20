@@ -19,6 +19,8 @@ export default function AdminProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [importing, setImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
@@ -34,7 +36,45 @@ export default function AdminProductsPage() {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     await deleteProduct(id);
     toast.success('Product deleted');
+    setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
     load();
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds((prev) => {
+      if (allVisibleSelected) {
+        return prev.filter((id) => !visibleProductIds.includes(id));
+      }
+      const merged = new Set([...prev, ...visibleProductIds]);
+      return Array.from(merged);
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const idsToDelete = selectedIds.filter((id) => visibleProductIds.includes(id));
+    if (!idsToDelete.length) {
+      toast.error('No products selected');
+      return;
+    }
+    if (!confirm(`Delete ${idsToDelete.length} selected product(s)? This cannot be undone.`)) return;
+
+    setBulkDeleting(true);
+    try {
+      await Promise.all(idsToDelete.map((id) => deleteProduct(id)));
+      toast.success(`Deleted ${idsToDelete.length} product(s)`);
+      setSelectedIds((prev) => prev.filter((id) => !idsToDelete.includes(id)));
+      await load();
+    } catch {
+      toast.error('Failed to delete selected products');
+    } finally {
+      setBulkDeleting(false);
+    }
   };
 
   const toggleActive = async (product: Product) => {
@@ -108,6 +148,10 @@ export default function AdminProductsPage() {
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
+  const visibleProductIds = filtered.map((product) => product.id);
+  const allVisibleSelected =
+    visibleProductIds.length > 0 && visibleProductIds.every((id) => selectedIds.includes(id));
+
   const categoryOptions = Array.from(
     new Set([
       ...categories.map((category) => category.slug),
@@ -123,6 +167,14 @@ export default function AdminProductsPage() {
           <p className="text-stone-500 mt-1">{products.length} total products</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting || selectedIds.filter((id) => visibleProductIds.includes(id)).length === 0}
+          >
+            {bulkDeleting ? 'Deleting...' : `Delete Selected (${selectedIds.filter((id) => visibleProductIds.includes(id)).length})`}
+          </Button>
           <input
             ref={fileInputRef}
             type="file"
@@ -189,6 +241,14 @@ export default function AdminProductsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-stone-100 bg-stone-50">
+                  <th className="text-left px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      aria-label="Select all visible products"
+                    />
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Product</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Category</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Price From</th>
@@ -206,10 +266,25 @@ export default function AdminProductsPage() {
                   return (
                     <tr key={product.id} className="hover:bg-stone-50 transition">
                       <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(product.id)}
+                          onChange={() => toggleSelectOne(product.id)}
+                          aria-label={`Select ${product.name}`}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 shrink-0">
                             {thumbnail ? (
-                              <Image src={thumbnail} alt={product.name} width={40} height={40} className="object-cover w-full h-full" />
+                              <Image
+                                src={thumbnail}
+                                alt={product.name}
+                                width={40}
+                                height={40}
+                                unoptimized
+                                className="object-cover w-full h-full"
+                              />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center"><Package className="w-5 h-5 text-stone-300" /></div>
                             )}
