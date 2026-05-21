@@ -11,7 +11,9 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'www.sspackaging.co.in' },
     ],
   },
+  experimental: {
+    proxyClientMaxBodySize: '100mb',
+  },
 };
 
 export default nextConfig;
-

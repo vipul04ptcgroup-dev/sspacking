@@ -11,9 +11,8 @@ const nextConfig = {
     ],
   },
   experimental: {
-    // Needed for react-hook-form with server components
+    proxyClientMaxBodySize: '100mb',
   },
 };
 
 module.exports = nextConfig;
-

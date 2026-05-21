@@ -330,7 +330,7 @@ export async function POST(request: Request) {
         }
 
         try {
-          const uploadedUrl = sourceAsUrl.startsWith('data:image/')
+          const uploadedUrl = /^data:image\//i.test(sourceAsUrl)
             ? await uploadBase64Image(sourceAsUrl, slug)
             : await uploadImageFromUrl(sourceAsUrl, slug);
           savedImages.push(uploadedUrl);
@@ -389,7 +389,7 @@ export async function POST(request: Request) {
           sku,
           price: price ?? null,
           size,
-          sourceImage: imageSources[0] || productUrl || '',
+          sourceImage: savedImages[0] || productUrl || '',
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
