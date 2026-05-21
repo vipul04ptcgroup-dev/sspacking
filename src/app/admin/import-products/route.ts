@@ -78,12 +78,25 @@ function toImageSourceList(raw: ImportProduct): string[] {
 }
 
 function toAbsoluteImageUrl(imageSource: string): string | null {
+  if (/^data:image\//i.test(imageSource)) return imageSource;
   if (/^https?:\/\//i.test(imageSource)) return imageSource;
   const base = process.env.IMPORT_IMAGE_BASE_URL?.trim();
   if (!base) return null;
   const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
   const normalizedPath = imageSource.replace(/^\/+/, '');
   return `${normalizedBase}/${normalizedPath}`;
+}
+
+function extensionFromMimeType(mimeType: string): string {
+  const normalized = mimeType.toLowerCase();
+  if (normalized === 'image/jpeg') return '.jpg';
+  if (normalized === 'image/png') return '.png';
+  if (normalized === 'image/webp') return '.webp';
+  if (normalized === 'image/gif') return '.gif';
+  if (normalized === 'image/svg+xml') return '.svg';
+  if (normalized === 'image/bmp') return '.bmp';
+  if (normalized === 'image/avif') return '.avif';
+  return '.jpg';
 }
 
 async function uploadImageFromUrl(imageUrl: string, productSlug: string): Promise<string> {
@@ -119,6 +132,35 @@ async function uploadImageFromUrl(imageUrl: string, productSlug: string): Promis
     resumable: false,
     metadata: {
       contentType,
+      metadata: {
+        firebaseStorageDownloadTokens: token,
+      },
+    },
+  });
+
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+}
+
+async function uploadBase64Image(dataUrl: string, productSlug: string): Promise<string> {
+  const { adminStorage } = getFirebaseAdmin();
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) {
+    throw new Error('Invalid base64 image format');
+  }
+
+  const [, mimeType, base64Payload] = match;
+  const extension = extensionFromMimeType(mimeType);
+  const filename = `${Date.now()}_${randomUUID()}${extension}`;
+  const filePath = `products/${productSlug}/${filename}`;
+  const token = randomUUID();
+  const bucket = adminStorage.bucket();
+  const file = bucket.file(filePath);
+  const fileBuffer = Buffer.from(base64Payload, 'base64');
+
+  await file.save(fileBuffer, {
+    resumable: false,
+    metadata: {
+      contentType: mimeType,
       metadata: {
         firebaseStorageDownloadTokens: token,
       },
@@ -288,7 +330,9 @@ export async function POST(request: Request) {
         }
 
         try {
-          const uploadedUrl = await uploadImageFromUrl(sourceAsUrl, slug);
+          const uploadedUrl = sourceAsUrl.startsWith('data:image/')
+            ? await uploadBase64Image(sourceAsUrl, slug)
+            : await uploadImageFromUrl(sourceAsUrl, slug);
           savedImages.push(uploadedUrl);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'unknown error';
