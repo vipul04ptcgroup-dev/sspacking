@@ -18,10 +18,12 @@ export default function ProductCard({ product }: ProductCardProps) {
     : product.variants[0];
 
   const previewImage = lowestVariant?.images?.[0] || product.images?.[0] || '';
+  const productUrl = `/products/${product.category}/${product.slug}`;
+  const enquiryUrl = `/contact?product=${encodeURIComponent(product.name)}&productUrl=${encodeURIComponent(productUrl)}#quote`;
 
   return (
-    <Link href={`/products/${product.category}/${product.slug}`} className="group block">
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
+    <div className="group bg-white rounded-2xl border border-stone-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
+      <Link href={productUrl} className="block">
         <div className="relative aspect-square bg-stone-50 overflow-hidden">
           {previewImage ? (
             <Image
@@ -49,27 +51,27 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
           </div>
         </div>
+      </Link>
 
-        <div className="p-4">
+      <div className="p-4">
+        <Link href={productUrl} className="block">
           <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide mb-1">{product.category}</p>
           <h3 className="text-sm font-bold text-stone-900 group-hover:text-amber-700 transition leading-snug line-clamp-2 mb-2">{product.name}</h3>
           <p className="text-xs text-stone-500 line-clamp-2 mb-3">{product.shortDescription}</p>
+        </Link>
 
-          <div className="flex items-center justify-between">
-            <div>
-              {hasPrice && lowestVariant?.price !== undefined && (
-                <span className="text-base font-black text-stone-900">{formatPrice(lowestVariant.price)}</span>
-              )}
-              <p className="text-[10px] text-stone-400 mt-0.5">{product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}</p>
-            </div>
-            {!hasPrice && (
-              <span className="inline-flex items-center rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-bold text-amber-600">
-                Enquiry
-              </span>
+        <div className="flex items-center justify-between">
+          <div>
+            {hasPrice && lowestVariant?.price !== undefined && (
+              <span className="text-base font-black text-stone-900">{formatPrice(lowestVariant.price)}</span>
             )}
+            <p className="text-[10px] text-stone-400 mt-0.5">{product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}</p>
           </div>
+          <Link href={enquiryUrl} className="inline-flex items-center rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-bold text-amber-600 hover:bg-amber-50 transition">
+            Enquiry
+          </Link>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

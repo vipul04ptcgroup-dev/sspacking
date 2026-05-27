@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { use } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronRight, Package, MessageSquare } from 'lucide-react';
+import { Package, MessageSquare } from 'lucide-react';
 import { getProductBySlug } from '@/lib/firestore';
 import type { Product, ProductVariant } from '@/types';
 import { formatPrice } from '@/lib/utils';
 
 export default function ProductDetailPage({ params }: { params: Promise<{ category: string; slug: string }> }) {
+  const router = useRouter();
   const { category, slug } = use(params);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,18 +35,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
   const selectedVariant: ProductVariant | null = product.variants[selectedVariantIndex] || null;
   const images = selectedVariant?.images?.length ? selectedVariant.images : (product.images || []);
   const hasSelectedVariantPrice = typeof selectedVariant?.price === 'number' && selectedVariant.price > 0;
+  const productUrl = `/products/${category}/${slug}`;
+  const enquiryUrl = `/contact?product=${encodeURIComponent(product.name)}&variant=${encodeURIComponent(selectedVariant?.capacity || '')}&variantId=${encodeURIComponent(selectedVariant?.id || '')}&productUrl=${encodeURIComponent(productUrl)}#quote`;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <nav className="flex items-center gap-2 text-sm text-stone-500 mb-8 flex-wrap">
-        <Link href="/" className="hover:text-amber-600">Home</Link>
-        <ChevronRight className="w-4 h-4" />
-        <Link href="/products" className="hover:text-amber-600">Products</Link>
-        <ChevronRight className="w-4 h-4" />
-        <Link href={`/products/${category}`} className="hover:text-amber-600">{product.category}</Link>
-        <ChevronRight className="w-4 h-4" />
+      <div className="flex items-center gap-2 text-sm text-stone-500 mb-8 flex-wrap">
+        <span>Home</span>
+        <span>/</span>
+        <span>Products</span>
+        <span>/</span>
+        <span>{product.category}</span>
+        <span>/</span>
         <span className="text-stone-900 font-medium truncate max-w-[200px]">{product.name}</span>
-      </nav>
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-12">
         <div>
@@ -68,6 +71,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
         </div>
 
         <div>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="text-sm font-semibold text-stone-700 hover:text-amber-600 mb-4"
+          >
+            {'< Back'}
+          </button>
           <p className="text-amber-600 font-semibold text-sm uppercase tracking-wide mb-2">{product.category}</p>
           <h1 className="text-3xl font-black text-stone-900 mb-4 leading-tight">{product.name}</h1>
           <p className="text-stone-500 text-sm mb-4 leading-relaxed">{product.shortDescription}</p>
@@ -98,15 +108,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
             </div>
           )}
 
-          {!hasSelectedVariantPrice && (
-            <Link
-              href={`/contact#quote?product=${encodeURIComponent(product.name)}&variant=${encodeURIComponent(selectedVariant?.capacity || '')}&variantId=${encodeURIComponent(selectedVariant?.id || '')}`}
-              className="flex items-center justify-center gap-2 w-full border-2 border-amber-500 text-amber-600 font-bold py-3 rounded-xl hover:bg-amber-50 transition mb-6"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Enquiry for This Product
-            </Link>
-          )}
+          <Link
+            href={enquiryUrl}
+            className="flex items-center justify-center gap-2 w-full border-2 border-amber-500 text-amber-600 font-bold py-3 rounded-xl hover:bg-amber-50 transition mb-6"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Enquiry for This Product
+          </Link>
 
           <div className="flex flex-wrap gap-2">
             {product.tags.map((tag, index) => (

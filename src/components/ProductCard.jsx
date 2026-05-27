@@ -14,6 +14,12 @@ const ProductCard = ({ product }) => {
         {firstVariant?.material} - {firstVariant?.size}
       </p>
       <p className="mt-2 font-bold text-blue-600">Rs. {firstVariant?.price}</p>
+      <button
+        type="button"
+        className="mt-3 inline-flex items-center rounded-lg border border-blue-600 px-3 py-1.5 text-xs font-semibold text-blue-600"
+      >
+        Enquiry
+      </button>
     </div>
   );
 };

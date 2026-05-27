@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useSearchParams } from 'next/navigation';
 import { createQuoteRequest } from '@/lib/firestore';
 import Input from '@/components/ui/Input';
 import { Textarea } from '@/components/ui';
@@ -28,25 +30,38 @@ type FormOutput = z.output<typeof schema>;
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormInput, unknown, FormOutput>({
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(schema),
   });
+
+  useEffect(() => {
+    const product = searchParams.get('product')?.trim() || '';
+    const variant = searchParams.get('variant')?.trim() || '';
+    const prefill = variant ? `${product} (${variant})` : product;
+
+    if (prefill) {
+      setValue('productInterest', prefill, { shouldValidate: true });
+    }
+  }, [searchParams, setValue]);
 
   const onSubmit: SubmitHandler<FormOutput> = async (data) => {
     setLoading(true);
     try {
+      const productUrl = searchParams.get('productUrl')?.trim() || '';
       await createQuoteRequest({
         name: data.name,
         email: data.email,
         phone: data.phone,
         company: data.company,
         productInterest: data.productInterest,
+        productUrl,
         quantity: data.quantity,
         message: data.message ?? '',
       });
       setSubmitted(true);
-      reset();
+      reset({ productInterest: '' });
     } catch { toast.error('Failed to send request. Please try again.'); }
     finally { setLoading(false); }
   };

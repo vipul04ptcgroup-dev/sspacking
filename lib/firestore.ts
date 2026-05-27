@@ -220,3 +220,7 @@ export async function getAllQuotes(): Promise<QuoteRequest[]> {
     return { id: d.id, ...data, createdAt: data.createdAt?.toDate?.() ?? new Date() } as QuoteRequest;
   });
 }
+
+export async function deleteQuoteRequest(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'quotes', id));
+}

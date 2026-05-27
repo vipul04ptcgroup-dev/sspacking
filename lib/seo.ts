@@ -49,7 +49,7 @@ export function buildMetadata({
       canonical: url,
     },
     openGraph: {
-      title,
+      title: SITE_NAME,
       description,
       url,
       siteName: SITE_NAME,

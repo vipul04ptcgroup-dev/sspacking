@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAllQuotes } from '@/lib/firestore';
+import Link from 'next/link';
+import { deleteQuoteRequest, getAllQuotes } from '@/lib/firestore';
 import type { QuoteRequest } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { Spinner, EmptyState } from '@/components/ui';
-import { MessageSquare } from 'lucide-react';
+import { ExternalLink, MessageSquare, Trash2 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   new: 'bg-blue-100 text-blue-700',
@@ -17,8 +18,46 @@ const STATUS_COLORS: Record<string, string> = {
 export default function AdminQuotesPage() {
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => { getAllQuotes().then(q => { setQuotes(q); setLoading(false); }); }, []);
+
+  const getProductLink = (productUrl?: string) => {
+    if (!productUrl) return '';
+    if (productUrl.startsWith('http://') || productUrl.startsWith('https://')) return productUrl;
+    if (typeof window === 'undefined') return productUrl;
+    return `${window.location.origin}${productUrl.startsWith('/') ? productUrl : `/${productUrl}`}`;
+  };
+
+  const getReplyHref = (quote: QuoteRequest) => {
+    const productLink = getProductLink(quote.productUrl);
+    const lines = [
+      `Hi ${quote.name},`,
+      '',
+      'Thank you for your enquiry.',
+      `Product: ${quote.productInterest}`,
+      ...(productLink ? [`Product Link: ${productLink}`] : []),
+      '',
+      'Please find our quote details below:',
+      '',
+      'Best regards,',
+      'SS Packaging',
+    ];
+    return `mailto:${quote.email}?subject=${encodeURIComponent('Re: Your Packaging Quote Request')}&body=${encodeURIComponent(lines.join('\n'))}`;
+  };
+
+  const handleDelete = async (quote: QuoteRequest) => {
+    const confirmed = window.confirm(`Delete quote request from ${quote.name}?`);
+    if (!confirmed) return;
+
+    setDeletingId(quote.id);
+    try {
+      await deleteQuoteRequest(quote.id);
+      setQuotes(prev => prev.filter(q => q.id !== quote.id));
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div>
@@ -62,10 +101,25 @@ export default function AdminQuotesPage() {
                   </div>
                 )}
               </div>
-              <div className="mt-4 flex gap-2">
-                <a href={`mailto:${quote.email}?subject=Re: Your Packaging Quote Request`} className="text-sm font-semibold text-amber-600 hover:text-amber-700 transition">
-                  Reply via Email →
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a href={getReplyHref(quote)} className="text-sm font-semibold text-amber-600 hover:text-amber-700 transition">
+                  Reply via Email {'->'}
                 </a>
+                {quote.productUrl && (
+                  <Link href={quote.productUrl} target="_blank" className="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-700 hover:text-amber-700 transition">
+                    <ExternalLink className="w-4 h-4" />
+                    Open Product
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDelete(quote)}
+                  disabled={deletingId === quote.id}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:text-red-700 transition disabled:opacity-60"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {deletingId === quote.id ? 'Deleting...' : 'Delete Quote'}
+                </button>
               </div>
             </div>
           ))}

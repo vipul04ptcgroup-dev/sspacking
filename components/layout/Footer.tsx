@@ -3,48 +3,23 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Phone, Mail, MapPin, Share2, Globe, Send } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { getCategories } from '@/lib/firestore';
-
-type Category = {
-  id: string | number;
-  name: string;
-  slug: string;
-};
+ 
 
 export default function Footer() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const data = await getCategories();
-        setCategories(data);
-      } catch (err) {
-        console.error('Footer categories fetch failed:', err);
-      } finally {
-        setLoadingCategories(false);
-      }
-    }
-
-    fetchCategories();
-  }, []);
-
   return (
     <footer className="bg-stone-900 text-stone-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 sm:pt-16 pb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 mb-12">
 
           {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
+          <div className="lg:col-span-5 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2 mb-4">
               <Image src="/Logo.png" alt="SS Packaging logo" width={40} height={40} className="w-auto h-16 object-contain" />
             </div>
-            <p className="text-sm leading-relaxed text-stone-400">
+            <p className="text-sm leading-relaxed text-stone-400 max-w-sm mx-auto sm:mx-0">
               India&apos;s trusted source for premium, eco-friendly, and industrial packaging solutions. Quality you can count on.
             </p>
-            <div className="flex gap-3 mt-5">
+            <div className="flex justify-center sm:justify-start gap-3 mt-5">
               {[Share2, Globe, Send].map((Icon, i) => (
                 <a key={i} href="#" className="w-9 h-9 bg-stone-800 hover:bg-amber-600 rounded-lg flex items-center justify-center transition-colors">
                   <Icon className="w-4 h-4" />
@@ -54,7 +29,7 @@ export default function Footer() {
           </div>
 
           {/* Quick Links */}
-          <div>
+          <div className="lg:col-span-3 text-center sm:text-left">
             <h4 className="text-white font-semibold mb-4">Quick Links</h4>
             <ul className="space-y-2.5">
               {[
@@ -73,35 +48,8 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Categories from backend
-          <div>
-            <h4 className="text-white font-semibold mb-4">Categories</h4>
-            {loadingCategories ? (
-              <ul className="space-y-2.5">
-                {[...Array(5)].map((_, i) => (
-                  <li key={i} className="h-4 w-32 bg-stone-700 rounded animate-pulse" />
-                ))}
-              </ul>
-            ) : categories.length === 0 ? (
-              <p className="text-sm text-stone-500">No categories available right now.</p>
-            ) : (
-              <ul className="space-y-2.5">
-                {categories.map((cat) => (
-                  <li key={cat.id}>
-                    <Link
-                      href={`/products/${cat.slug}`}
-                      className="text-sm text-stone-400 hover:text-amber-400 transition-colors"
-                    >
-                      {cat.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div> */}
-
           {/* Contact */}
-          <div>
+          <div className="lg:col-span-4 text-center sm:text-left">
             <h4 className="text-white font-semibold mb-4">Contact Us</h4>
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5 text-sm text-stone-400">
@@ -125,9 +73,9 @@ export default function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="pt-8 border-t border-stone-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-500">
+        <div className="pt-8 border-t border-stone-800 flex flex-col md:flex-row items-center md:items-center justify-between gap-4 text-xs text-stone-500 text-center md:text-left">
           <p>&copy; {new Date().getFullYear()} SS Packaging. All rights reserved.</p>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-5 gap-y-2">
             <Link href="/privacy" className="hover:text-amber-400 transition">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-amber-400 transition">Terms of Service</Link>
             <Link href="/shipping" className="hover:text-amber-400 transition">Shipping Policy</Link>

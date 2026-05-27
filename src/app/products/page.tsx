@@ -2,12 +2,37 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { getProducts, getCategories } from '@/lib/firestore';
 import type { Product, Category } from '@/types';
-import ProductGrid from '@/components/product/ProductGrid';
 import { SlidersHorizontal, X } from 'lucide-react';
 
+const ProductGrid = dynamic(() => import('@/components/product/ProductGrid'), {
+  loading: () => <ProductGridSkeleton />,
+});
+
+function ProductGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="bg-white rounded-2xl border border-stone-100 overflow-hidden animate-pulse">
+          <div className="aspect-square bg-stone-100" />
+          <div className="p-4 space-y-2">
+            <div className="h-3 bg-stone-100 rounded w-1/3" />
+            <div className="h-4 bg-stone-100 rounded w-3/4" />
+            <div className="h-3 bg-stone-100 rounded w-full" />
+            <div className="h-5 bg-stone-100 rounded w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ProductsContent() {
+  const INITIAL_PRODUCTS_TO_SHOW = 12;
+  const PRODUCTS_BATCH_SIZE = 16;
+  const LOAD_MORE_DELAY_MS = 120;
   const searchParams = useSearchParams();
   const q = searchParams?.get('q') || '';
   const [products, setProducts] = useState<Product[]>([]);
@@ -16,13 +41,30 @@ function ProductsContent() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PRODUCTS_TO_SHOW);
+  const OTHER_CATEGORY_KEY = '__others__';
 
   useEffect(() => {
-    Promise.all([getProducts(), getCategories()]).then(([p, c]) => {
-      setProducts(p);
+    let mounted = true;
+
+    getProducts()
+      .then(p => {
+        if (!mounted) return;
+        setProducts(p);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+
+    getCategories().then(c => {
+      if (!mounted) return;
       setCategories(c);
-      setLoading(false);
     });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   let filtered = products;
@@ -37,8 +79,17 @@ function ProductsContent() {
     );
   }
 
+  const normalizeCategory = (value: string) => value.trim().toLowerCase();
+  const knownCategoryKeys = new Set(
+    categories.flatMap(cat => [normalizeCategory(cat.slug), normalizeCategory(cat.name)])
+  );
+
   if (selectedCategory) {
-    filtered = filtered.filter(p => p.category === selectedCategory);
+    if (selectedCategory === OTHER_CATEGORY_KEY) {
+      filtered = filtered.filter(p => !knownCategoryKeys.has(normalizeCategory(p.category || '')));
+    } else {
+      filtered = filtered.filter(p => normalizeCategory(p.category || '') === normalizeCategory(selectedCategory));
+    }
   }
 
   if (sortBy === 'price-asc') {
@@ -48,6 +99,25 @@ function ProductsContent() {
   } else if (sortBy === 'name') {
     filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  useEffect(() => {
+    setVisibleCount(Math.min(INITIAL_PRODUCTS_TO_SHOW, filtered.length));
+  }, [q, selectedCategory, sortBy, filtered.length]);
+
+  useEffect(() => {
+    if (loading || visibleCount >= filtered.length) return;
+
+    const timer = window.setTimeout(() => {
+      setVisibleCount(current => Math.min(current + PRODUCTS_BATCH_SIZE, filtered.length));
+    }, LOAD_MORE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [visibleCount, filtered.length, loading]);
+
+  const visibleProducts = filtered.slice(0, visibleCount);
+  const isProgressivelyLoading = !loading && visibleCount < filtered.length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -84,6 +154,12 @@ function ProductsContent() {
             {cat.name}
           </button>
         ))}
+        <button
+          onClick={() => setSelectedCategory(selectedCategory === OTHER_CATEGORY_KEY ? '' : OTHER_CATEGORY_KEY)}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${selectedCategory === OTHER_CATEGORY_KEY ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
+        >
+          Others
+        </button>
 
         <div className="ml-auto">
           <select
@@ -109,7 +185,12 @@ function ProductsContent() {
         )}
       </div>
 
-      <ProductGrid products={filtered} loading={loading} />
+      <ProductGrid products={visibleProducts} loading={loading} />
+      {isProgressivelyLoading && (
+        <p className="text-center text-xs text-stone-500 mt-5">
+          Loading more products...
+        </p>
+      )}
     </div>
   );
 }

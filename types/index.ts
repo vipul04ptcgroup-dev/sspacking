@@ -111,6 +111,7 @@ export interface QuoteRequest {
   phone: string;
   company?: string;
   productInterest: string;
+  productUrl?: string;
   quantity: string;
   message: string;
   status: 'new' | 'contacted' | 'quoted' | 'closed';
