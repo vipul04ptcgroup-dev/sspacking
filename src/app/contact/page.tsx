@@ -31,14 +31,15 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
+  const getSearchParam = (key: string) => searchParams?.get(key)?.trim() || '';
 
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(schema),
   });
 
   useEffect(() => {
-    const product = searchParams.get('product')?.trim() || '';
-    const variant = searchParams.get('variant')?.trim() || '';
+    const product = getSearchParam('product');
+    const variant = getSearchParam('variant');
     const prefill = variant ? `${product} (${variant})` : product;
 
     if (prefill) {
@@ -49,7 +50,7 @@ export default function ContactPage() {
   const onSubmit: SubmitHandler<FormOutput> = async (data) => {
     setLoading(true);
     try {
-      const productUrl = searchParams.get('productUrl')?.trim() || '';
+      const productUrl = getSearchParam('productUrl');
       await createQuoteRequest({
         name: data.name,
         email: data.email,
