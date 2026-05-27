@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,6 +28,25 @@ type FormInput = z.input<typeof schema>;
 type FormOutput = z.output<typeof schema>;
 
 export default function ContactPage() {
+  return (
+    <Suspense fallback={<ContactPageFallback />}>
+      <ContactPageContent />
+    </Suspense>
+  );
+}
+
+function ContactPageFallback() {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="text-center mb-14">
+        <h1 className="text-4xl sm:text-5xl font-black text-stone-900 mb-4">Get in Touch</h1>
+        <p className="text-stone-500 text-lg max-w-xl mx-auto">Loading contact form...</p>
+      </div>
+    </div>
+  );
+}
+
+function ContactPageContent() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
