@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { getAllOrders, updateOrderStatus } from '@/lib/firestore';
 import type { Order, OrderStatus } from '@/types';
 import { formatPrice, formatDate, ORDER_STATUS_COLORS } from '@/lib/utils';
-import { Spinner, EmptyState, Select } from '@/components/ui';
+import { Spinner, EmptyState } from '@/components/ui';
 import { ShoppingBag, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 

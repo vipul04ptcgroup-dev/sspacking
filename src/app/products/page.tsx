@@ -133,7 +133,12 @@ function ProductsContent() {
       <div className="flex flex-wrap items-center gap-3 mb-8 pb-6 border-b border-stone-200">
         <button
           onClick={() => setShowFilters(v => !v)}
-          className="flex items-center gap-2 px-4 py-2 border border-stone-200 rounded-lg text-sm font-medium text-stone-700 hover:border-amber-400 hover:text-amber-600 transition"
+          aria-pressed={showFilters}
+          className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition ${
+            showFilters
+              ? 'border-amber-400 text-amber-700 bg-amber-50'
+              : 'border-stone-200 text-stone-700 hover:border-amber-400 hover:text-amber-600'
+          }`}
         >
           <SlidersHorizontal className="w-4 h-4" /> Filters
         </button>

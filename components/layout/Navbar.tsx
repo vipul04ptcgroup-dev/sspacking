@@ -8,7 +8,7 @@ import { User, Menu, X, Search, LogOut, Package, LayoutDashboard } from 'lucide-
 import { useAuth } from '@/context/auth-context';
 
 export default function Navbar() {
-  const { user, userProfile, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);

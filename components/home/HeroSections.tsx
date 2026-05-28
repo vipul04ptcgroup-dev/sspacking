@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowRight, Shield, Leaf, Award, Truck } from 'lucide-react';
 
 export function HeroBanner() {

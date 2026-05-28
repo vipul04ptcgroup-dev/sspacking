@@ -23,7 +23,6 @@ const schema = z.object({
   message: z.string().default(''),
 });
 
-type FormData = z.infer<typeof schema>;
 type FormInput = z.input<typeof schema>;
 type FormOutput = z.output<typeof schema>;
 

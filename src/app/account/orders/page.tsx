@@ -7,7 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import { getUserOrders } from '@/lib/firestore';
 import { formatPrice, formatDate, ORDER_STATUS_COLORS } from '@/lib/utils';
 import type { Order } from '@/types';
-import { Spinner, EmptyState, Badge } from '@/components/ui';
+import { Spinner, EmptyState } from '@/components/ui';
 import { Package, ChevronRight } from 'lucide-react';
 
 export default function OrdersPage() {
