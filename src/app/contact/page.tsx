@@ -37,10 +37,10 @@ export default function ContactPage() {
 
 function ContactPageFallback() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <div className="text-center mb-14">
-        <h1 className="text-4xl sm:text-5xl font-black text-stone-900 mb-4">Get in Touch</h1>
-        <p className="text-stone-500 text-lg max-w-xl mx-auto">Loading contact form...</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+      <div className="text-center mb-10 sm:mb-14">
+        <h1 className="text-3xl sm:text-5xl font-black text-stone-900 mb-3 sm:mb-4">Get in Touch</h1>
+        <p className="text-stone-500 text-base sm:text-lg max-w-xl mx-auto">Loading contact form...</p>
       </div>
     </div>
   );
@@ -66,6 +66,27 @@ function ContactPageContent() {
     }
   }, [searchParams, setValue]);
 
+  const sendQuoteEmail = async (data: FormOutput, productUrl: string) => {
+    try {
+      await fetch('/api/quote-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          company: data.company,
+          productInterest: data.productInterest,
+          productUrl,
+          quantity: data.quantity,
+          message: data.message ?? '',
+        }),
+      });
+    } catch {
+      // Intentionally ignore email errors to avoid disturbing quote submission flow.
+    }
+  };
+
   const onSubmit: SubmitHandler<FormOutput> = async (data) => {
     setLoading(true);
     try {
@@ -82,46 +103,47 @@ function ContactPageContent() {
       });
       setSubmitted(true);
       reset({ productInterest: '' });
+      void sendQuoteEmail(data, productUrl);
     } catch { toast.error('Failed to send request. Please try again.'); }
     finally { setLoading(false); }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
       {/* Header */}
-      <div className="text-center mb-14">
-        <h1 className="text-4xl sm:text-5xl font-black text-stone-900 mb-4">Get in Touch</h1>
-        <p className="text-stone-500 text-lg max-w-xl mx-auto">Have a question or need a custom packaging quote? We'd love to hear from you.</p>
+      <div className="text-center mb-10 sm:mb-14">
+        <h1 className="text-3xl sm:text-5xl font-black text-stone-900 mb-3 sm:mb-4">Get in Touch</h1>
+        <p className="text-stone-500 text-base sm:text-lg max-w-xl mx-auto">Have a question or need a custom packaging quote? We'd love to hear from you.</p>
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-12">
+      <div className="grid lg:grid-cols-5 gap-8 sm:gap-12">
         {/* Contact info */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-5 sm:space-y-6">
           <div>
-            <h2 className="text-xl font-black text-stone-900 mb-6">Contact Information</h2>
+            <h2 className="text-lg sm:text-xl font-black text-stone-900 mb-5 sm:mb-6">Contact Information</h2>
             {[
               { icon: Phone, label: 'Phone', value: '+91 91208 79879', href: 'tel:+919876543210' },
               { icon: Mail, label: 'Email', value: 'ptcvirar@gmail.com', href: 'mailto:ptcvirar@gmail.com' },
               { icon: MapPin, label: 'Address', value: 'Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra, India.' },
               { icon: Clock, label: 'Hours', value: 'Mon – Sat: 9:00 AM – 6:00 PM' },
             ].map(item => (
-              <div key={item.label} className="flex items-start gap-4 mb-5">
-                <div className="w-11 h-11 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
-                  <item.icon className="w-5 h-5 text-amber-600" />
+              <div key={item.label} className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-5">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+                  <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">{item.label}</p>
                   {item.href ? (
-                    <a href={item.href} className="text-stone-800 font-medium hover:text-amber-600 transition text-sm">{item.value}</a>
+                    <a href={item.href} className="text-stone-800 font-medium hover:text-amber-600 transition text-sm break-words">{item.value}</a>
                   ) : (
-                    <p className="text-stone-800 font-medium text-sm">{item.value}</p>
+                    <p className="text-stone-800 font-medium text-sm break-words">{item.value}</p>
                   )}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 sm:p-5">
             <h3 className="font-bold text-stone-900 mb-2">Bulk Order Discounts</h3>
             <p className="text-sm text-stone-600 leading-relaxed">
               We offer special pricing for bulk orders. Contact us with your requirements and we'll provide a custom quote within 24 hours.
@@ -131,17 +153,17 @@ function ContactPageContent() {
 
         {/* Quote form */}
         <div className="lg:col-span-3" id="quote">
-          <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-8">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-100 shadow-sm p-5 sm:p-8">
             {submitted ? (
-              <div className="text-center py-12">
-                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <h3 className="text-2xl font-black text-stone-900 mb-2">Request Received!</h3>
+              <div className="text-center py-8 sm:py-12">
+                <CheckCircle className="w-14 h-14 sm:w-16 sm:h-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl sm:text-2xl font-black text-stone-900 mb-2">Request Received!</h3>
                 <p className="text-stone-500 mb-6">We'll get back to you within 24 hours with a detailed quote.</p>
                 <Button onClick={() => setSubmitted(false)} variant="outline">Send Another Request</Button>
               </div>
             ) : (
               <>
-                <h2 className="text-2xl font-black text-stone-900 mb-6">Request a Quote</h2>
+                <h2 className="text-xl sm:text-2xl font-black text-stone-900 mb-5 sm:mb-6">Request a Quote</h2>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid sm:grid-cols-2 gap-4">
                     <Input label="Full Name *" id="name" placeholder="John Doe" error={errors.name?.message} {...register('name')} />
