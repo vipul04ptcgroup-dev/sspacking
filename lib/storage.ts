@@ -17,6 +17,15 @@ export async function uploadCategoryImage(file: File, categoryId: string): Promi
   return uploadImage(file, `categories/${categoryId}/${filename}`);
 }
 
+export async function uploadDeliveryChallanImage(
+  file: File,
+  challanRef: string,
+  section: 'consignment' | 'pod' = 'consignment',
+): Promise<string> {
+  const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  return uploadImage(file, `delivery-challans/${challanRef}/${section}/${filename}`);
+}
+
 export async function deleteImage(url: string): Promise<void> {
   const storageRef = ref(storage, decodeURIComponent(url.split('/o/')[1].split('?')[0]));
   await deleteObject(storageRef);

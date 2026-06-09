@@ -7,7 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import { Spinner } from '@/components/ui';
 import {
   LayoutDashboard, Package, ShoppingBag, Tags, Users, MessageSquare,
-  ArrowLeft, Menu,
+  ArrowLeft, Menu, FileText,
 } from 'lucide-react';
 
 const navItems = [
@@ -15,6 +15,7 @@ const navItems = [
   { icon: Package, label: 'Products', href: '/admin/products' },
   { icon: Tags, label: 'Categories', href: '/admin/categories' },
   { icon: ShoppingBag, label: 'Orders', href: '/admin/orders' },
+  { icon: FileText, label: 'Delivery Challan', href: '/admin/delivery-challan' },
   { icon: Users, label: 'Customers', href: '/admin/users' },
   { icon: MessageSquare, label: 'Quote Requests', href: '/admin/quotes' },
 ];
@@ -35,10 +36,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen bg-stone-100">
       {/* Mobile overlay */}
-      {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && <div className="admin-mobile-overlay fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 w-64 bg-stone-900 z-30 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static`}>
+      <aside className={`admin-sidebar fixed top-0 left-0 w-64 bg-stone-900 z-30 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static`}>
         <div className="p-5 border-b border-stone-800">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-9 h-9 bg-amber-500 rounded-xl flex items-center justify-center">
@@ -82,13 +83,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main */}
       <div className="flex-1 min-w-0">
         {/* Top bar (mobile) */}
-        <div className="lg:hidden sticky top-0 z-10 bg-white border-b border-stone-200 px-4 h-14 flex items-center gap-3">
+        <div className="admin-mobile-bar lg:hidden sticky top-0 z-10 bg-white border-b border-stone-200 px-4 h-14 flex items-center gap-3">
           <button onClick={() => setSidebarOpen(true)} className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg">
             <Menu className="w-5 h-5" />
           </button>
           <span className="font-bold text-stone-900">Admin Panel</span>
         </div>
-        <div className="p-4 lg:p-8">{children}</div>
+        <div className="admin-content-shell p-4 lg:p-8">{children}</div>
       </div>
     </div>
   );

@@ -74,8 +74,9 @@ export interface OrderItem {
   quantity: number;
 }
 
-export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'dispatched' | 'shipped' | 'delivered' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type DeliveryChallanStatus = 'draft' | 'ready' | 'dispatched' | 'delivered' | 'cancelled';
 
 export interface Order {
   id: string;
@@ -87,11 +88,48 @@ export interface Order {
   shippingCost: number;
   total: number;
   status: OrderStatus;
+  challanId?: string;
   paymentStatus: PaymentStatus;
   paymentMethod: string;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface TransportDetails {
+  transporterName?: string;
+  vehicleNumber?: string;
+  driverName?: string;
+  driverPhone?: string;
+  lrNumber?: string;
+  trackingNumber?: string;
+  expectedDeliveryDate?: string;
+  notes?: string;
+}
+
+export interface DeliveryChallan {
+  id: string;
+  challanNumber: string;
+  orderId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  shippingAddress: Address;
+  billingAddress: Address;
+  products: OrderItem[];
+  remarks?: string;
+  transportDetails: TransportDetails;
+  consignmentImages: string[];
+  proofOfDeliveryImages: string[];
+  receiverName?: string;
+  receiverPhone?: string;
+  deliveryRemarks?: string;
+  status: DeliveryChallanStatus;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  dispatchedAt?: Date | null;
+  deliveredAt?: Date | null;
 }
 
 export interface User {

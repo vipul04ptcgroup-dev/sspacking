@@ -56,6 +56,10 @@ export default function Footer() {
                 <MapPin className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                 Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra, India.
               </li>
+              <li className="flex items-start gap-2.5 text-sm text-stone-400">
+                <MapPin className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                Unit no. 13, Pragati Compound, Dongri Pada Road, near Jain Mandir, Poman, Vasai Bhiwandi Road, Vasai East, Palghar - 401208
+              </li>
               <li className="flex items-center gap-2.5 text-sm text-stone-400">
                 <Phone className="w-4 h-4 text-amber-500 shrink-0" />
                 <a href="tel:+919876543210" className="hover:text-amber-400 transition">+91 91208 79879</a>
