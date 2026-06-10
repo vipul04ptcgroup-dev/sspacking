@@ -242,6 +242,11 @@ export default function DeliveryChallanForm() {
     try {
       validateAddress(billingAddress, 'Billing address');
       validateAddress(shippingAddress, 'Shipping address');
+      const selectedOrder = orders.find((item) => item.id === selectedOrderId);
+
+      if (!selectedOrder) {
+        throw new Error('Selected order could not be loaded.');
+      }
 
       const normalizedBillingAddress = {
         ...billingAddress,
@@ -256,12 +261,18 @@ export default function DeliveryChallanForm() {
 
       await createDeliveryChallan({
         orderId: selectedOrderId,
+        orderSource: selectedOrder.source || 'website_order',
+        manualOrderId: selectedOrder.manualOrderId || selectedOrder.id,
         customerName,
         customerEmail,
         customerPhone,
         billingAddress: normalizedBillingAddress,
         shippingAddress: normalizedShippingAddress,
         products,
+        subtotal: selectedOrder.subtotal,
+        discount: selectedOrder.discount || 0,
+        gst: selectedOrder.gst || 0,
+        totalAmount: selectedOrder.total,
         remarks: remarks.trim(),
         transportDetails: {
           ...transportDetails,

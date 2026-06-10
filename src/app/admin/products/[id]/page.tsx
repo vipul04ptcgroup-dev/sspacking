@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getProductById, updateProduct } from '@/lib/firestore';
+import { useAuth } from '@/context/auth-context';
 import type { Product } from '@/types';
 import ProductForm from '@/components/admin/ProductForm';
 import { Spinner } from '@/components/ui';
@@ -10,11 +11,12 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
-type ProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+type ProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stockStatus'>;
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { user } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -23,7 +25,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   }, [id]);
 
   const handleSubmit = async (data: ProductPayload) => {
-    await updateProduct(id, data);
+    await updateProduct(id, {
+      ...data,
+      lastStockUpdatedBy: user?.email || user?.uid || 'admin',
+    });
     toast.success('Product updated!');
     router.push('/admin/products', { scroll: true });
   };

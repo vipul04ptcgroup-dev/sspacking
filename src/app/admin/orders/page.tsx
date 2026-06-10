@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAllOrders, updateOrderStatus } from '@/lib/firestore';
+import { useAuth } from '@/context/auth-context';
 import type { Order, OrderStatus } from '@/types';
 import { formatPrice, formatDate, ORDER_STATUS_COLORS } from '@/lib/utils';
 import { Spinner, EmptyState } from '@/components/ui';
@@ -19,6 +20,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export default function AdminOrdersPage() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
@@ -33,7 +35,7 @@ export default function AdminOrdersPage() {
   useEffect(() => { load(); }, []);
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    await updateOrderStatus(orderId, status);
+    await updateOrderStatus(orderId, status, user?.email || user?.uid || 'admin');
     toast.success(`Order status updated to ${status}`);
     load();
   };

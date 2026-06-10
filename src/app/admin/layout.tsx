@@ -7,14 +7,16 @@ import { useAuth } from '@/context/auth-context';
 import { Spinner } from '@/components/ui';
 import {
   LayoutDashboard, Package, ShoppingBag, Tags, Users, MessageSquare,
-  ArrowLeft, Menu, FileText,
+  ArrowLeft, Menu, FileText, Boxes, ReceiptText,
 } from 'lucide-react';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
   { icon: Package, label: 'Products', href: '/admin/products' },
+  { icon: Boxes, label: 'Inventory', href: '/admin/inventory' },
   { icon: Tags, label: 'Categories', href: '/admin/categories' },
   { icon: ShoppingBag, label: 'Orders', href: '/admin/orders' },
+  { icon: ReceiptText, label: 'Sales', href: '/admin/sales' },
   { icon: FileText, label: 'Delivery Challan', href: '/admin/delivery-challan' },
   { icon: Users, label: 'Customers', href: '/admin/users' },
   { icon: MessageSquare, label: 'Quote Requests', href: '/admin/quotes' },

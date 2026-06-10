@@ -13,6 +13,7 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const pricedVariants = product.variants.filter(v => typeof v.price === 'number' && v.price > 0);
   const hasPrice = pricedVariants.length > 0;
+  const isOutOfStock = product.stockQuantity <= 0;
   const lowestVariant = hasPrice
     ? pricedVariants.reduce((min, v) => (v.price as number) < (min.price as number) ? v : min, pricedVariants[0])
     : product.variants[0];
@@ -45,6 +46,19 @@ export default function ProductCard({ product }: ProductCardProps) {
               Featured
             </div>
           )}
+          <div className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+            product.stockStatus === 'out_of_stock'
+              ? 'bg-red-100 text-red-700'
+              : product.stockStatus === 'low_stock'
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-green-100 text-green-700'
+          }`}>
+            {product.stockStatus === 'out_of_stock'
+              ? 'Out of stock'
+              : product.stockStatus === 'low_stock'
+                ? 'Low stock'
+                : 'In stock'}
+          </div>
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
             <div className="bg-white text-stone-700 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-lg">
               <Eye className="w-3.5 h-3.5" /> View
@@ -65,7 +79,11 @@ export default function ProductCard({ product }: ProductCardProps) {
             {hasPrice && lowestVariant?.price !== undefined && (
               <span className="text-base font-black text-stone-900">{formatPrice(lowestVariant.price)}</span>
             )}
-            <p className="text-[10px] text-stone-400 mt-0.5">{product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}</p>
+            <p className={`text-[10px] mt-0.5 ${isOutOfStock ? 'text-red-500' : 'text-stone-400'}`}>
+              {isOutOfStock
+                ? 'Checkout unavailable'
+                : `${product.variants.length} variant${product.variants.length !== 1 ? 's' : ''}`}
+            </p>
           </div>
           <Link href={enquiryUrl} className="inline-flex items-center rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-bold text-amber-600 hover:bg-amber-50 transition">
             Enquiry

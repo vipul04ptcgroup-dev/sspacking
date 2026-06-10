@@ -51,6 +51,19 @@ function formatDateTime(date?: Date | null): string {
   }).format(date);
 }
 
+function formatAddressForPrint(address: DeliveryChallan['billingAddress'] | DeliveryChallan['shippingAddress']): string {
+  const parts = [
+    address.fullName,
+    address.phone,
+    address.addressLine1,
+    address.addressLine2,
+    [address.city, address.state, address.pincode].filter(Boolean).join(' - '),
+    address.country,
+  ];
+
+  return parts.filter(Boolean).join(', ') || '-';
+}
+
 function AddressBlock({
   title,
   address,
@@ -135,6 +148,11 @@ export default function DeliveryChallanDetailPage() {
       },
     ];
   }, [challan]);
+
+  const printTotalQuantity = useMemo(
+    () => challan?.products.reduce((total, product) => total + product.quantity, 0) ?? 0,
+    [challan],
+  );
 
   const handlePrint = () => {
     window.print();
@@ -352,12 +370,28 @@ export default function DeliveryChallanDetailPage() {
                   <p className="mt-1 text-sm text-stone-800">{challan.challanNumber}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Linked Order ID</p>
-                  <p className="mt-1 text-sm text-stone-800">{challan.orderId || '-'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                    {challan.orderSource === 'manual_sale' ? 'Manual Order ID' : 'Linked Order ID'}
+                  </p>
+                  <p className="mt-1 text-sm text-stone-800">
+                    {challan.orderSource === 'manual_sale' ? (challan.manualOrderId || challan.orderId || '-') : (challan.orderId || '-')}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Created By</p>
                   <p className="mt-1 text-sm text-stone-800">{challan.createdBy || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Subtotal</p>
+                  <p className="mt-1 text-sm text-stone-800">{formatPrice(challan.subtotal || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">GST</p>
+                  <p className="mt-1 text-sm text-stone-800">{formatPrice(challan.gst || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Total Amount</p>
+                  <p className="mt-1 text-sm text-stone-800">{formatPrice(challan.totalAmount || 0)}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Created At</p>
@@ -747,85 +781,73 @@ export default function DeliveryChallanDetailPage() {
       <div className="delivery-challan-print">
         <div className="print-sheet">
           <header className="print-header">
-            <div className="print-brand">
-              <Image src="/Logo.png" alt="SS Packaging logo" width={72} height={72} className="print-logo" />
+            <div className="print-title-block">
+              <p className="print-document-title">Delivery Challan</p>
+              <p className="print-copy-label">Original For Consignee</p>
+            </div>
+            <div className="print-company-block">
+              <Image src="/Logo.png" alt="SS Packaging logo" width={58} height={58} className="print-logo" />
               <div>
                 <p className="print-company-name">SS Packaging</p>
-                <p className="print-company-subtitle">Delivery Challan</p>
-              </div>
-            </div>
-
-            <div className="print-challan-meta">
-              <div>
-                <span>Challan No.</span>
-                <strong>{challan.challanNumber}</strong>
-              </div>
-              <div>
-                <span>Date</span>
-                <strong>{formatDate(challan.dispatchedAt || challan.createdAt)}</strong>
-              </div>
-              <div>
-                <span>Order ID</span>
-                <strong>{challan.orderId || '-'}</strong>
+                <p className="print-company-address">
+                  Office no. 201-202, Hirubhai Residency, Besides Vedant Hospital, Virar (West) - 401303
+                </p>
+                <p className="print-company-address">
+                  Unit no. 13, Pragati Compound, Poman, Vasai East, Palghar - 401208
+                </p>
               </div>
             </div>
           </header>
 
-          <section className="print-address-bar">
-            <div>
-              <p className="print-section-caption">Office Address</p>
-              <p>Office no. 201-202, Hirubhai Residency, Besides Vedant Hospital, Virar (West) - 401303, Maharashtra, India.</p>
+          <section className="print-box print-meta-box">
+            <div className="print-meta-cell">
+              <span className="print-label">Challan No.</span>
+              <strong>{challan.challanNumber}</strong>
             </div>
-            <div>
-              <p className="print-section-caption">Factory Address</p>
-              <p>Unit no. 13, Pragati Compound, Dongri Pada Road, near Jain Mandir, Poman, Vasai Bhiwandi Road, Vasai East, Palghar - 401208.</p>
+            <div className="print-meta-cell">
+              <span className="print-label">Date</span>
+              <strong>{formatDate(challan.dispatchedAt || challan.createdAt)}</strong>
             </div>
-          </section>
-
-          <section className="print-grid print-grid-two">
-            <div className="print-card">
-              <p className="print-section-title">Customer Details</p>
-              <div className="print-detail-list">
-                <p><strong>Name:</strong> {challan.customerName || '-'}</p>
-                <p><strong>Email:</strong> {challan.customerEmail || '-'}</p>
-                <p><strong>Phone:</strong> {challan.customerPhone || '-'}</p>
-              </div>
+            <div className="print-meta-cell">
+              <span className="print-label">Order ID</span>
+              <strong>{challan.orderSource === 'manual_sale' ? (challan.manualOrderId || challan.orderId || '-') : (challan.orderId || '-')}</strong>
             </div>
-
-            <div className="print-card">
-              <p className="print-section-title">Shipping Address</p>
-              <div className="print-detail-list">
-                <p>{challan.shippingAddress.fullName || challan.customerName || '-'}</p>
-                <p>{challan.shippingAddress.phone || challan.customerPhone || '-'}</p>
-                <p>{challan.shippingAddress.addressLine1 || '-'}</p>
-                {challan.shippingAddress.addressLine2 ? <p>{challan.shippingAddress.addressLine2}</p> : null}
-                <p>
-                  {challan.shippingAddress.city || '-'}, {challan.shippingAddress.state || '-'} - {challan.shippingAddress.pincode || '-'}
-                </p>
-                <p>{challan.shippingAddress.country || '-'}</p>
-              </div>
+            <div className="print-meta-cell">
+              <span className="print-label">Status</span>
+              <strong>{challan.status}</strong>
             </div>
           </section>
 
-          <section className="print-card print-products-card">
-            <div className="print-section-row">
-              <p className="print-section-title">Product Details</p>
-              <p className="print-section-note">Dispatch copy</p>
+          <section className="print-box print-party-grid">
+            <div className="print-party-cell">
+              <p className="print-section-title">Party Details</p>
+              <p><strong>Name:</strong> {challan.customerName || '-'}</p>
+              <p><strong>Phone:</strong> {challan.customerPhone || '-'}</p>
+              <p><strong>Email:</strong> {challan.customerEmail || '-'}</p>
+              <p><strong>Billing Address:</strong> {formatAddressForPrint(challan.billingAddress)}</p>
             </div>
+            <div className="print-party-cell">
+              <p className="print-section-title">Delivery Address</p>
+              <p>{formatAddressForPrint(challan.shippingAddress)}</p>
+            </div>
+          </section>
 
+          <section className="print-box">
             <table className="print-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Product</th>
+                  <th className="print-col-small">Sr.</th>
+                  <th>Description Of Goods</th>
                   <th>Variant / SKU</th>
-                  <th>Quantity</th>
+                  <th className="print-col-small">Qty</th>
+                  <th>Price</th>
+                  <th>Total</th>
                 </tr>
               </thead>
               <tbody>
                 {challan.products.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="print-empty">No products added to this challan.</td>
+                    <td colSpan={6} className="print-empty">No products added to this challan.</td>
                   </tr>
                 ) : (
                   challan.products.map((product, index) => (
@@ -834,39 +856,69 @@ export default function DeliveryChallanDetailPage() {
                       <td>{product.productName}</td>
                       <td>{[product.variantLabel, product.sku].filter(Boolean).join(' / ') || '-'}</td>
                       <td>{product.quantity}</td>
+                      <td>{formatPrice(product.price || 0)}</td>
+                      <td>{formatPrice((product.price || 0) * product.quantity)}</td>
                     </tr>
                   ))
                 )}
+                <tr className="print-total-row">
+                  <td colSpan={3}>Total Quantity</td>
+                  <td>{printTotalQuantity}</td>
+                  <td>{challan.gst ? `GST ${formatPrice(challan.gst)}` : '-'}</td>
+                  <td>{formatPrice(challan.totalAmount || 0)}</td>
+                </tr>
               </tbody>
             </table>
           </section>
 
-          <section className="print-grid print-grid-two">
-            <div className="print-card">
-              <p className="print-section-title">Transportation Details</p>
-              <div className="print-detail-list">
-                <p><strong>Transporter Name:</strong> {challan.transportDetails.transporterName || '-'}</p>
-                <p><strong>Vehicle Number:</strong> {challan.transportDetails.vehicleNumber || '-'}</p>
-                <p><strong>Driver Name:</strong> {challan.transportDetails.driverName || '-'}</p>
-                <p><strong>Driver Phone:</strong> {challan.transportDetails.driverPhone || '-'}</p>
-                <p><strong>LR / Docket Number:</strong> {challan.transportDetails.lrNumber || '-'}</p>
-              </div>
+          <section className="print-box print-summary-box">
+            <div className="print-summary-row">
+              <span>Manual Order ID</span>
+              <strong>{challan.orderSource === 'manual_sale' ? (challan.manualOrderId || challan.orderId || '-') : '-'}</strong>
             </div>
+            <div className="print-summary-row">
+              <span>Subtotal</span>
+              <strong>{formatPrice(challan.subtotal || 0)}</strong>
+            </div>
+            <div className="print-summary-row">
+              <span>Discount</span>
+              <strong>{formatPrice(challan.discount || 0)}</strong>
+            </div>
+            <div className="print-summary-row">
+              <span>GST</span>
+              <strong>{formatPrice(challan.gst || 0)}</strong>
+            </div>
+            <div className="print-summary-row">
+              <span>Total Amount</span>
+              <strong>{formatPrice(challan.totalAmount || 0)}</strong>
+            </div>
+          </section>
 
-            <div className="print-card">
-              <p className="print-section-title">Remarks</p>
-              <div className="print-detail-list">
-                <p>{challan.remarks || challan.transportDetails.notes || '-'}</p>
-              </div>
+          <section className="print-box print-transport-grid">
+            <div className="print-transport-cell">
+              <p className="print-section-title">Transport Details</p>
+              <p><strong>Transporter:</strong> {challan.transportDetails.transporterName || '-'}</p>
+              <p><strong>Vehicle No.:</strong> {challan.transportDetails.vehicleNumber || '-'}</p>
+              <p><strong>Driver Name:</strong> {challan.transportDetails.driverName || '-'}</p>
+              <p><strong>Driver Phone:</strong> {challan.transportDetails.driverPhone || '-'}</p>
+            </div>
+            <div className="print-transport-cell">
+              <p className="print-section-title">Dispatch Notes</p>
+              <p><strong>LR No.:</strong> {challan.transportDetails.lrNumber || '-'}</p>
+              <p><strong>Expected Delivery:</strong> {challan.transportDetails.expectedDeliveryDate || '-'}</p>
+              <p><strong>Remarks:</strong> {challan.remarks || challan.transportDetails.notes || '-'}</p>
             </div>
           </section>
 
           <footer className="print-signatures">
             <div className="print-signature-box">
-              <span>Authorized Signature</span>
+              <span>Prepared By</span>
             </div>
             <div className="print-signature-box">
               <span>Receiver Signature</span>
+            </div>
+            <div className="print-signature-box">
+              <span>Authorized Signatory</span>
             </div>
           </footer>
         </div>
@@ -911,133 +963,109 @@ export default function DeliveryChallanDetailPage() {
             min-height: 273mm;
             margin: 0 auto;
             color: #1c1917;
-            font-size: 12px;
-            line-height: 1.45;
+            font-size: 11px;
+            line-height: 1.35;
           }
 
           .print-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 24px;
-            border-bottom: 2px solid #f59e0b;
-            padding-bottom: 16px;
+            border: 1px solid #1c1917;
+            padding: 10px 12px;
           }
 
-          .print-brand {
+          .print-title-block {
+            text-align: center;
+            border-bottom: 1px solid #1c1917;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+          }
+
+          .print-document-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+          }
+
+          .print-copy-label {
+            margin: 4px 0 0;
+            font-size: 10px;
+            text-transform: uppercase;
+          }
+
+          .print-company-block {
             display: flex;
-            align-items: center;
-            gap: 14px;
+            align-items: flex-start;
+            gap: 12px;
           }
 
           .print-company-name {
             margin: 0;
-            font-size: 28px;
+            font-size: 20px;
             font-weight: 800;
-            letter-spacing: 0.02em;
-            color: #111827;
           }
 
-          .print-company-subtitle {
-            margin: 4px 0 0;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: #d97706;
+          .print-company-address {
+            margin: 2px 0 0;
+            font-size: 10px;
           }
 
-          .print-challan-meta {
-            min-width: 220px;
-            border: 1px solid #d6d3d1;
+          .print-box {
+            border: 1px solid #1c1917;
+            margin-top: 12px;
           }
 
-          .print-challan-meta div {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
+          .print-meta-box,
+          .print-party-grid,
+          .print-transport-grid,
+          .print-signatures {
+            display: grid;
+          }
+
+          .print-meta-box {
+            grid-template-columns: repeat(4, 1fr);
+          }
+
+          .print-meta-cell,
+          .print-party-cell,
+          .print-transport-cell,
+          .print-signature-box {
             padding: 8px 10px;
-            border-bottom: 1px solid #e7e5e4;
+            border-right: 1px solid #1c1917;
           }
 
-          .print-challan-meta div:last-child {
-            border-bottom: none;
+          .print-meta-cell:last-child,
+          .print-party-cell:last-child,
+          .print-transport-cell:last-child,
+          .print-signature-box:last-child {
+            border-right: none;
           }
 
-          .print-challan-meta span {
-            color: #57534e;
-            font-weight: 600;
+          .print-meta-cell strong {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
           }
 
-          .print-challan-meta strong {
-            color: #111827;
-            font-weight: 700;
-          }
-
-          .print-address-bar,
-          .print-grid {
-            margin-top: 18px;
-          }
-
-          .print-address-bar {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            padding: 12px 14px;
-            background: #fffbeb;
-            border: 1px solid #fcd34d;
-          }
-
-          .print-section-caption {
-            margin: 0 0 4px;
-            font-size: 11px;
-            font-weight: 700;
+          .print-label {
+            display: block;
+            font-size: 10px;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #b45309;
+            font-weight: 700;
           }
 
-          .print-grid-two {
-            display: grid;
+          .print-party-grid,
+          .print-transport-grid {
             grid-template-columns: 1fr 1fr;
-            gap: 16px;
-          }
-
-          .print-card {
-            border: 1px solid #d6d3d1;
-            padding: 14px;
-            break-inside: avoid;
-          }
-
-          .print-products-card {
-            margin-top: 18px;
           }
 
           .print-section-title {
-            margin: 0 0 10px;
-            font-size: 13px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #111827;
-          }
-
-          .print-section-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-          }
-
-          .print-section-note {
-            margin: 0;
-            color: #78716c;
-            font-size: 11px;
-            font-weight: 600;
-          }
-
-          .print-detail-list p {
             margin: 0 0 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-bottom: 1px solid #1c1917;
+            padding-bottom: 4px;
           }
 
           .print-table {
@@ -1047,18 +1075,37 @@ export default function DeliveryChallanDetailPage() {
 
           .print-table th,
           .print-table td {
-            border: 1px solid #d6d3d1;
-            padding: 9px 10px;
+            border: 1px solid #1c1917;
+            padding: 8px 9px;
             text-align: left;
             vertical-align: top;
           }
 
           .print-table thead th {
-            background: #1c1917;
-            color: #ffffff;
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 0.06em;
+            background: #f5f5f4;
+          }
+
+          .print-summary-box {
+            margin-top: 12px;
+            padding: 8px 10px;
+          }
+
+          .print-summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 4px 0;
+          }
+
+          .print-col-small {
+            width: 10%;
+          }
+
+          .print-total-row td {
+            font-weight: 700;
           }
 
           .print-empty {
@@ -1067,20 +1114,16 @@ export default function DeliveryChallanDetailPage() {
           }
 
           .print-signatures {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-top: 36px;
-            padding-top: 22px;
+            grid-template-columns: repeat(3, 1fr);
+            margin-top: 16px;
+            border: 1px solid #1c1917;
           }
 
           .print-signature-box {
-            min-height: 88px;
+            min-height: 72px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            border-top: 1px solid #1c1917;
-            padding-top: 8px;
             font-weight: 700;
           }
         }

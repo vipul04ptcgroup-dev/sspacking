@@ -1,18 +1,55 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCartStore } from '@/store/cart-store';
+import { getOrderItemStockIssues } from '@/lib/firestore';
 import { formatPrice } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui';
 
 export default function CartPage() {
+  const router = useRouter();
   const { items, removeItem, updateQuantity, total, itemCount } = useCartStore();
+  const [stockIssueMap, setStockIssueMap] = useState<Record<string, string>>({});
   const cartTotal = total();
   const count = itemCount();
   const shippingCost = cartTotal >= 2000 ? 0 : 150;
+
+  useEffect(() => {
+    let mounted = true;
+
+    const validateStock = async () => {
+      if (!items.length) {
+        if (mounted) setStockIssueMap({});
+        return;
+      }
+
+      const issues = await getOrderItemStockIssues(items);
+      if (!mounted) return;
+
+      const nextMap = issues.reduce<Record<string, string>>((acc, issue) => {
+        acc[`${issue.productId}-${issue.variantId}`] =
+          issue.reason === 'insufficient_stock'
+            ? 'In stock'
+            : 'Out of stock';
+        return acc;
+      }, {});
+
+      setStockIssueMap(nextMap);
+    };
+
+    void validateStock();
+
+    return () => {
+      mounted = false;
+    };
+  }, [items]);
+
+  const hasStockIssues = useMemo(() => Object.keys(stockIssueMap).length > 0, [stockIssueMap]);
 
   if (!count) {
     return (
@@ -32,7 +69,6 @@ export default function CartPage() {
       <h1 className="text-3xl font-black text-stone-900 mb-8">Shopping Cart ({count} items)</h1>
 
       <div className="grid lg:grid-cols-3 gap-10">
-        {/* Cart items */}
         <div className="lg:col-span-2 space-y-4">
           {items.map(item => (
             <div key={`${item.productId}-${item.variantId}`} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 flex gap-4">
@@ -50,6 +86,9 @@ export default function CartPage() {
                   {item.productName}
                 </Link>
                 <p className="text-xs text-stone-500 mt-0.5">{item.variantLabel}</p>
+                {stockIssueMap[`${item.productId}-${item.variantId}`] ? (
+                  <p className="mt-1 text-xs font-semibold text-red-600">{stockIssueMap[`${item.productId}-${item.variantId}`]}</p>
+                ) : null}
                 <p className="text-base font-black text-stone-900 mt-1">{formatPrice(item.price)}</p>
                 <div className="flex items-center justify-between mt-3">
                   <div className="flex items-center border border-stone-200 rounded-lg overflow-hidden">
@@ -73,7 +112,6 @@ export default function CartPage() {
           ))}
         </div>
 
-        {/* Order summary */}
         <div>
           <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 sticky top-24">
             <h2 className="text-lg font-bold text-stone-900 mb-5">Order Summary</h2>
@@ -88,19 +126,27 @@ export default function CartPage() {
                   {shippingCost === 0 ? 'FREE' : formatPrice(shippingCost)}
                 </span>
               </div>
-              {shippingCost > 0 && (
-                <p className="text-xs text-stone-400">Free shipping on orders above ₹2,000</p>
-              )}
+              {shippingCost > 0 ? (
+                <p className="text-xs text-stone-400">Free shipping on orders above Rs. 2,000</p>
+              ) : null}
+              {hasStockIssues ? (
+                <p className="text-xs font-medium text-red-600">Remove or update out-of-stock items before checkout.</p>
+              ) : null}
               <div className="pt-3 border-t border-stone-100 flex justify-between">
                 <span className="text-base font-bold text-stone-900">Total</span>
                 <span className="text-xl font-black text-stone-900">{formatPrice(cartTotal + shippingCost)}</span>
               </div>
             </div>
-            <Link href="/checkout" className="block mt-6">
-              <Button size="lg" className="w-full" disabled>
+            <div className="mt-6">
+              <Button
+                size="lg"
+                className="w-full"
+                disabled={hasStockIssues}
+                onClick={() => router.push('/checkout')}
+              >
                 Proceed to Checkout <ArrowRight className="w-4 h-4" />
               </Button>
-            </Link>
+            </div>
             <Link href="/products" className="block mt-3 text-center text-sm text-stone-500 hover:text-amber-600 transition">
               Continue Shopping
             </Link>

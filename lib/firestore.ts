@@ -1,18 +1,47 @@
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, serverTimestamp, runTransaction,
+  query, where, orderBy, limit, serverTimestamp, runTransaction, writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type {
   Product,
   Category,
   Order,
+  OrderItem,
+  InventoryTransaction,
   User,
   QuoteRequest,
   OrderStatus,
   DeliveryChallan,
   DeliveryChallanStatus,
 } from '@/types';
+
+const DEFAULT_INITIAL_STOCK_QUANTITY = 1;
+
+function sanitizeStockValue(value: unknown, fallback = 0): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.floor(value));
+}
+
+export function calculateStockStatus(stockQuantity: number, lowStockLimit: number): Product['stockStatus'] {
+  if (stockQuantity <= 0) return 'out_of_stock';
+  if (stockQuantity <= lowStockLimit) return 'low_stock';
+  return 'in_stock';
+}
+
+function resolveProductStockFields(data: Partial<Product>, fallback?: Partial<Product>) {
+  const stockQuantity = sanitizeStockValue(
+    data.stockQuantity ?? fallback?.stockQuantity,
+    DEFAULT_INITIAL_STOCK_QUANTITY,
+  );
+  const lowStockLimit = sanitizeStockValue(data.lowStockLimit ?? fallback?.lowStockLimit);
+
+  return {
+    stockQuantity,
+    lowStockLimit,
+    stockStatus: calculateStockStatus(stockQuantity, lowStockLimit),
+  };
+}
 
 function normalizeProduct(id: string, data: Record<string, unknown>): Product {
   const variants = (Array.isArray(data.variants) ? data.variants : []).map((v: any) => ({
@@ -42,6 +71,14 @@ function normalizeProduct(id: string, data: Record<string, unknown>): Product {
     featured: Boolean(data.featured),
     active: Boolean(data.active),
     hasVariants: typeof data.hasVariants === 'boolean' ? data.hasVariants : variants.length > 0,
+    stockQuantity: sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
+    lowStockLimit: sanitizeStockValue(data.lowStockLimit),
+    stockStatus: calculateStockStatus(
+      sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
+      sanitizeStockValue(data.lowStockLimit),
+    ),
+    lastStockUpdatedAt: (data.lastStockUpdatedAt as any)?.toDate?.() ?? null,
+    lastStockUpdatedBy: (data.lastStockUpdatedBy as string) || '',
     createdAt: (data.createdAt as any)?.toDate?.() ?? new Date(),
     updatedAt: (data.updatedAt as any)?.toDate?.() ?? new Date(),
   };
@@ -60,12 +97,18 @@ function normalizeDeliveryChallan(id: string, data: Record<string, unknown>): De
     id,
     challanNumber: (data.challanNumber as string) || '',
     orderId: (data.orderId as string) || '',
+    orderSource: (data.orderSource as DeliveryChallan['orderSource']) || 'website_order',
+    manualOrderId: (data.manualOrderId as string) || '',
     customerName: (data.customerName as string) || '',
     customerEmail: (data.customerEmail as string) || '',
     customerPhone: (data.customerPhone as string) || '',
     shippingAddress: data.shippingAddress as DeliveryChallan['shippingAddress'],
     billingAddress: data.billingAddress as DeliveryChallan['billingAddress'],
     products: Array.isArray(data.products) ? (data.products as DeliveryChallan['products']) : [],
+    subtotal: typeof data.subtotal === 'number' ? data.subtotal : 0,
+    discount: typeof data.discount === 'number' ? data.discount : 0,
+    gst: typeof data.gst === 'number' ? data.gst : 0,
+    totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : 0,
     remarks: (data.remarks as string) || '',
     transportDetails:
       data.transportDetails && typeof data.transportDetails === 'object'
@@ -89,11 +132,34 @@ function normalizeOrder(id: string, data: Record<string, unknown>): Order {
   return {
     id,
     ...data,
+    source: (data.source as Order['source']) || 'website_order',
+    manualOrderId: (data.manualOrderId as string) || undefined,
+    discount: typeof data.discount === 'number' ? data.discount : 0,
+    gst: typeof data.gst === 'number' ? data.gst : 0,
     status: (data.status as OrderStatus) || 'pending',
     challanId: (data.challanId as string) || undefined,
+    stockRestoredOnCancel: Boolean(data.stockRestoredOnCancel),
     createdAt: (data.createdAt as any)?.toDate?.() ?? new Date(),
     updatedAt: (data.updatedAt as any)?.toDate?.() ?? new Date(),
   } as Order;
+}
+
+function normalizeInventoryTransaction(id: string, data: Record<string, unknown>): InventoryTransaction {
+  return {
+    id,
+    productId: (data.productId as string) || '',
+    productName: (data.productName as string) || '',
+    type: (data.type as InventoryTransaction['type']) || 'IN',
+    source: (data.source as InventoryTransaction['source']) || 'ADMIN_STOCK_ADD',
+    orderId: (data.orderId as string) || undefined,
+    manualOrderId: (data.manualOrderId as string) || undefined,
+    quantity: sanitizeStockValue(data.quantity),
+    previousStock: sanitizeStockValue(data.previousStock),
+    newStock: sanitizeStockValue(data.newStock),
+    note: (data.note as string) || '',
+    createdAt: toDateOrNow(data.createdAt),
+    createdBy: (data.createdBy as string) || '',
+  };
 }
 
 function parseDeliveryChallanSequence(challanNumber: string | undefined): number {
@@ -169,6 +235,68 @@ export async function getAllProducts(): Promise<Product[]> {
   return snap.docs.map(d => normalizeProduct(d.id, d.data()));
 }
 
+export async function backfillProductStockFields(): Promise<number> {
+  const snap = await getDocs(collection(db, 'products'));
+  const batch = writeBatch(db);
+  let updates = 0;
+
+  snap.docs.forEach((productDoc) => {
+    const data = productDoc.data() as Record<string, unknown>;
+    const hasStockQuantity = typeof data.stockQuantity === 'number';
+    const hasLowStockLimit = typeof data.lowStockLimit === 'number';
+    const hasStockStatus = typeof data.stockStatus === 'string';
+    const hasLastStockUpdatedAt = 'lastStockUpdatedAt' in data;
+    const hasLastStockUpdatedBy = typeof data.lastStockUpdatedBy === 'string';
+    const isLegacyAutoZeroedStock =
+      hasStockQuantity &&
+      sanitizeStockValue(data.stockQuantity) === 0 &&
+      data.lastStockUpdatedAt == null &&
+      ((data.lastStockUpdatedBy as string) || '') === '';
+
+    if (
+      hasStockQuantity &&
+      hasLowStockLimit &&
+      hasStockStatus &&
+      hasLastStockUpdatedAt &&
+      hasLastStockUpdatedBy &&
+      !isLegacyAutoZeroedStock
+    ) {
+      return;
+    }
+
+    const stockFields = resolveProductStockFields({
+      stockQuantity: isLegacyAutoZeroedStock
+        ? DEFAULT_INITIAL_STOCK_QUANTITY
+        : sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
+      lowStockLimit: sanitizeStockValue(data.lowStockLimit),
+    });
+
+    batch.update(productDoc.ref, {
+      ...stockFields,
+      lastStockUpdatedAt:
+        isLegacyAutoZeroedStock
+          ? serverTimestamp()
+          : hasLastStockUpdatedAt
+            ? data.lastStockUpdatedAt
+            : null,
+      lastStockUpdatedBy:
+        isLegacyAutoZeroedStock
+          ? 'system_init'
+          : hasLastStockUpdatedBy
+            ? data.lastStockUpdatedBy
+            : '',
+      updatedAt: serverTimestamp(),
+    });
+    updates += 1;
+  });
+
+  if (updates > 0) {
+    await batch.commit();
+  }
+
+  return updates;
+}
+
 export async function getFeaturedProducts(): Promise<Product[]> {
   try {
     const q = query(
@@ -203,13 +331,41 @@ export async function getProductById(id: string): Promise<Product | null> {
   return normalizeProduct(snap.id, snap.data());
 }
 
-export async function createProduct(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-  const ref = await addDoc(collection(db, 'products'), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+export async function createProduct(
+  data: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stockStatus'> & {
+    stockStatus?: Product['stockStatus'];
+  },
+): Promise<string> {
+  const stockFields = resolveProductStockFields(data);
+  const ref = await addDoc(collection(db, 'products'), {
+    ...data,
+    ...stockFields,
+    lastStockUpdatedAt: data.lastStockUpdatedAt ?? new Date(),
+    lastStockUpdatedBy: data.lastStockUpdatedBy || 'admin',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
   return ref.id;
 }
 
 export async function updateProduct(id: string, data: Partial<Product>): Promise<void> {
-  await updateDoc(doc(db, 'products', id), { ...data, updatedAt: serverTimestamp() });
+  const existing = await getProductById(id);
+  if (!existing) {
+    throw new Error('Product not found.');
+  }
+
+  const stockFields = resolveProductStockFields(data, existing);
+  const stockChanged =
+    stockFields.stockQuantity !== existing.stockQuantity ||
+    stockFields.lowStockLimit !== existing.lowStockLimit;
+
+  await updateDoc(doc(db, 'products', id), {
+    ...data,
+    ...stockFields,
+    lastStockUpdatedAt: stockChanged ? new Date() : existing.lastStockUpdatedAt ?? null,
+    lastStockUpdatedBy: stockChanged ? data.lastStockUpdatedBy || existing.lastStockUpdatedBy || 'admin' : existing.lastStockUpdatedBy || '',
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteProduct(id: string): Promise<void> {
@@ -223,10 +379,245 @@ export async function createOrder(data: Omit<Order, 'id' | 'createdAt' | 'update
   return ref.id;
 }
 
-export async function getUserOrders(userId: string): Promise<Order[]> {
-  const q = query(collection(db, 'orders'), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+export async function createWebsiteOrderWithInventory(
+  data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<string> {
+  const orderRef = doc(collection(db, 'orders'));
+  const inventoryCollectionRef = collection(db, 'inventoryTransactions');
+
+  await runTransaction(db, async (transaction) => {
+    const aggregatedItems = data.items.reduce<Map<string, {
+      productId: string;
+      productName: string;
+      quantity: number;
+    }>>((acc, item) => {
+      const existing = acc.get(item.productId);
+      if (existing) {
+        existing.quantity += item.quantity;
+        return acc;
+      }
+
+      acc.set(item.productId, {
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+      });
+      return acc;
+    }, new Map());
+
+    for (const aggregatedItem of aggregatedItems.values()) {
+      const productRef = doc(db, 'products', aggregatedItem.productId);
+      const productSnap = await transaction.get(productRef);
+
+      if (!productSnap.exists()) {
+        throw new Error(`${aggregatedItem.productName} is no longer available.`);
+      }
+
+      const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+      const previousStock = product.stockQuantity;
+
+      if (previousStock <= 0) {
+        throw new Error(`${product.name} is out of stock.`);
+      }
+
+      if (aggregatedItem.quantity > previousStock) {
+        throw new Error(`${product.name} has only ${previousStock} in stock.`);
+      }
+
+      const newStock = previousStock - aggregatedItem.quantity;
+      const nextStockFields = resolveProductStockFields({
+        stockQuantity: newStock,
+        lowStockLimit: product.lowStockLimit,
+      });
+
+      transaction.update(productRef, {
+        ...nextStockFields,
+        lastStockUpdatedAt: serverTimestamp(),
+        lastStockUpdatedBy: 'system',
+        updatedAt: serverTimestamp(),
+      });
+
+      const inventoryRef = doc(inventoryCollectionRef);
+      transaction.set(inventoryRef, {
+        productId: product.id,
+        productName: product.name,
+        type: 'OUT',
+        source: 'WEBSITE_ORDER',
+        orderId: orderRef.id,
+        quantity: aggregatedItem.quantity,
+        previousStock,
+        newStock,
+        createdAt: serverTimestamp(),
+        createdBy: 'system',
+      });
+    }
+
+    transaction.set(orderRef, {
+      ...data,
+      source: data.source || 'website_order',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  return orderRef.id;
+}
+
+export async function createManualSaleWithInventory(
+  data: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'source' | 'manualOrderId' | 'challanId'>,
+  createdBy: string,
+): Promise<string> {
+  const orderRef = doc(collection(db, 'orders'));
+  const inventoryCollectionRef = collection(db, 'inventoryTransactions');
+
+  await runTransaction(db, async (transaction) => {
+    const aggregatedItems = data.items.reduce<Map<string, {
+      productId: string;
+      productName: string;
+      quantity: number;
+    }>>((acc, item) => {
+      const existing = acc.get(item.productId);
+      if (existing) {
+        existing.quantity += item.quantity;
+        return acc;
+      }
+
+      acc.set(item.productId, {
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+      });
+      return acc;
+    }, new Map());
+
+    for (const aggregatedItem of aggregatedItems.values()) {
+      const productRef = doc(db, 'products', aggregatedItem.productId);
+      const productSnap = await transaction.get(productRef);
+
+      if (!productSnap.exists()) {
+        throw new Error(`${aggregatedItem.productName} is no longer available.`);
+      }
+
+      const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+      const previousStock = product.stockQuantity;
+
+      if (previousStock <= 0) {
+        throw new Error(`${product.name} is out of stock.`);
+      }
+
+      if (aggregatedItem.quantity > previousStock) {
+        throw new Error(`${product.name} has only ${previousStock} in stock.`);
+      }
+
+      const newStock = previousStock - aggregatedItem.quantity;
+      const nextStockFields = resolveProductStockFields({
+        stockQuantity: newStock,
+        lowStockLimit: product.lowStockLimit,
+      });
+
+      transaction.update(productRef, {
+        ...nextStockFields,
+        lastStockUpdatedAt: serverTimestamp(),
+        lastStockUpdatedBy: createdBy,
+        updatedAt: serverTimestamp(),
+      });
+
+      const inventoryRef = doc(inventoryCollectionRef);
+      transaction.set(inventoryRef, {
+        productId: product.id,
+        productName: product.name,
+        type: 'OUT',
+        source: 'MANUAL_SALE',
+        manualOrderId: orderRef.id,
+        quantity: aggregatedItem.quantity,
+        previousStock,
+        newStock,
+        createdAt: serverTimestamp(),
+        createdBy,
+      });
+    }
+
+    transaction.set(orderRef, {
+      ...data,
+      source: 'manual_sale',
+      manualOrderId: orderRef.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  return orderRef.id;
+}
+
+export async function addInventoryStock(
+  productId: string,
+  quantity: number,
+  note: string,
+  createdBy: string,
+): Promise<void> {
+  const safeQuantity = sanitizeStockValue(quantity);
+  if (safeQuantity <= 0) {
+    throw new Error('Quantity must be greater than 0.');
+  }
+
+  const productRef = doc(db, 'products', productId);
+  const inventoryRef = doc(collection(db, 'inventoryTransactions'));
+
+  await runTransaction(db, async (transaction) => {
+    const productSnap = await transaction.get(productRef);
+
+    if (!productSnap.exists()) {
+      throw new Error('Product not found.');
+    }
+
+    const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+    const previousStock = product.stockQuantity;
+    const newStock = previousStock + safeQuantity;
+    const nextStockFields = resolveProductStockFields({
+      stockQuantity: newStock,
+      lowStockLimit: product.lowStockLimit,
+    });
+
+    transaction.update(productRef, {
+      ...nextStockFields,
+      lastStockUpdatedAt: serverTimestamp(),
+      lastStockUpdatedBy: createdBy,
+      updatedAt: serverTimestamp(),
+    });
+
+    transaction.set(inventoryRef, {
+      productId: product.id,
+      productName: product.name,
+      type: 'IN',
+      source: 'ADMIN_STOCK_ADD',
+      quantity: safeQuantity,
+      previousStock,
+      newStock,
+      note: note.trim(),
+      createdAt: serverTimestamp(),
+      createdBy,
+    });
+  });
+}
+
+export async function getInventoryTransactions(): Promise<InventoryTransaction[]> {
+  const q = query(collection(db, 'inventoryTransactions'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => normalizeOrder(d.id, d.data()));
+  return snap.docs.map((docSnap) => normalizeInventoryTransaction(docSnap.id, docSnap.data()));
+}
+
+export async function getUserOrders(userId: string): Promise<Order[]> {
+  try {
+    const q = query(collection(db, 'orders'), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => normalizeOrder(d.id, d.data()));
+  } catch {
+    const fallbackQ = query(collection(db, 'orders'), where('userId', '==', userId));
+    const snap = await getDocs(fallbackQ);
+    return snap.docs
+      .map((d) => normalizeOrder(d.id, d.data()))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
 }
 
 export async function getAllOrders(): Promise<Order[]> {
@@ -235,14 +626,267 @@ export async function getAllOrders(): Promise<Order[]> {
   return snap.docs.map((d) => normalizeOrder(d.id, d.data()));
 }
 
+export async function getManualSales(): Promise<Order[]> {
+  try {
+    const q = query(collection(db, 'orders'), where('source', '==', 'manual_sale'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => normalizeOrder(d.id, d.data()));
+  } catch {
+    const fallbackQ = query(collection(db, 'orders'), where('source', '==', 'manual_sale'));
+    const snap = await getDocs(fallbackQ);
+    return snap.docs
+      .map((d) => normalizeOrder(d.id, d.data()))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+}
+
 export async function getOrderById(id: string): Promise<Order | null> {
   const snap = await getDoc(doc(db, 'orders', id));
   if (!snap.exists()) return null;
   return normalizeOrder(snap.id, snap.data());
 }
 
-export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
-  await updateDoc(doc(db, 'orders', id), { status, updatedAt: serverTimestamp() });
+export async function updateOrderStatus(id: string, status: OrderStatus, updatedBy = 'admin'): Promise<void> {
+  const orderRef = doc(db, 'orders', id);
+  const inventoryCollectionRef = collection(db, 'inventoryTransactions');
+
+  await runTransaction(db, async (transaction) => {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists()) {
+      throw new Error('Order not found.');
+    }
+
+    const order = normalizeOrder(orderSnap.id, orderSnap.data() as Record<string, unknown>);
+    const shouldRestoreStock = status === 'cancelled' && !order.stockRestoredOnCancel;
+    const shouldDeductStockAgain = status !== 'cancelled' && order.status === 'cancelled' && order.stockRestoredOnCancel;
+    const aggregatedItems = order.items.reduce<Map<string, {
+      productId: string;
+      productName: string;
+      quantity: number;
+    }>>((acc, item) => {
+      const existing = acc.get(item.productId);
+      if (existing) {
+        existing.quantity += item.quantity;
+        return acc;
+      }
+
+      acc.set(item.productId, {
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+      });
+      return acc;
+    }, new Map());
+
+    if (shouldRestoreStock) {
+      for (const aggregatedItem of aggregatedItems.values()) {
+        const productRef = doc(db, 'products', aggregatedItem.productId);
+        const productSnap = await transaction.get(productRef);
+
+        if (!productSnap.exists()) {
+          continue;
+        }
+
+        const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+        const previousStock = product.stockQuantity;
+        const newStock = previousStock + aggregatedItem.quantity;
+        const nextStockFields = resolveProductStockFields({
+          stockQuantity: newStock,
+          lowStockLimit: product.lowStockLimit,
+        });
+
+        transaction.update(productRef, {
+          ...nextStockFields,
+          lastStockUpdatedAt: serverTimestamp(),
+          lastStockUpdatedBy: updatedBy,
+          updatedAt: serverTimestamp(),
+        });
+
+        const inventoryRef = doc(inventoryCollectionRef);
+        transaction.set(inventoryRef, {
+          productId: product.id,
+          productName: product.name,
+          type: 'IN',
+          source: 'ORDER_CANCELLATION',
+          orderId: order.id,
+          ...(order.manualOrderId ? { manualOrderId: order.manualOrderId } : {}),
+          quantity: aggregatedItem.quantity,
+          previousStock,
+          newStock,
+          note: `Stock restored after order cancellation (${order.manualOrderId || order.id})`,
+          createdAt: serverTimestamp(),
+          createdBy: updatedBy,
+        });
+      }
+    }
+
+    if (shouldDeductStockAgain) {
+      for (const aggregatedItem of aggregatedItems.values()) {
+        const productRef = doc(db, 'products', aggregatedItem.productId);
+        const productSnap = await transaction.get(productRef);
+
+        if (!productSnap.exists()) {
+          throw new Error(`${aggregatedItem.productName} is no longer available.`);
+        }
+
+        const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+        const previousStock = product.stockQuantity;
+
+        if (aggregatedItem.quantity > previousStock) {
+          throw new Error(`${product.name} has only ${previousStock} in stock.`);
+        }
+
+        const newStock = previousStock - aggregatedItem.quantity;
+        const nextStockFields = resolveProductStockFields({
+          stockQuantity: newStock,
+          lowStockLimit: product.lowStockLimit,
+        });
+
+        transaction.update(productRef, {
+          ...nextStockFields,
+          lastStockUpdatedAt: serverTimestamp(),
+          lastStockUpdatedBy: updatedBy,
+          updatedAt: serverTimestamp(),
+        });
+
+        const inventoryRef = doc(inventoryCollectionRef);
+        transaction.set(inventoryRef, {
+          productId: product.id,
+          productName: product.name,
+          type: 'OUT',
+          source: 'ORDER_REACTIVATION',
+          orderId: order.id,
+          ...(order.manualOrderId ? { manualOrderId: order.manualOrderId } : {}),
+          quantity: aggregatedItem.quantity,
+          previousStock,
+          newStock,
+          note: `Stock deducted after order reactivation (${order.manualOrderId || order.id})`,
+          createdAt: serverTimestamp(),
+          createdBy: updatedBy,
+        });
+      }
+    }
+
+    transaction.update(orderRef, {
+      status,
+      ...(shouldRestoreStock ? { stockRestoredOnCancel: true } : {}),
+      ...(shouldDeductStockAgain ? { stockRestoredOnCancel: false } : {}),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function generateDeliveryChallanFromOrder(orderId: string, createdBy: string): Promise<string> {
+  const existing = await getDeliveryChallansByOrderId(orderId);
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const order = await getOrderById(orderId);
+  if (!order) {
+    throw new Error('Order not found.');
+  }
+
+  const shippingAddress = {
+    ...order.shippingAddress,
+    country: order.shippingAddress.country || 'India',
+  };
+
+  const challanId = await createDeliveryChallan({
+    orderId: order.id,
+    orderSource: order.source || 'website_order',
+    manualOrderId: order.manualOrderId || order.id,
+    customerName: order.shippingAddress.fullName || '',
+    customerEmail: order.userEmail || '',
+    customerPhone: order.shippingAddress.phone || '',
+    billingAddress: shippingAddress,
+    shippingAddress,
+    products: order.items.map((item) => ({ ...item })),
+    subtotal: order.subtotal,
+    discount: order.discount || 0,
+    gst: order.gst || 0,
+    totalAmount: order.total,
+    remarks: order.notes || '',
+    transportDetails: {},
+    consignmentImages: [],
+    proofOfDeliveryImages: [],
+    receiverName: '',
+    receiverPhone: '',
+    deliveryRemarks: '',
+    status: 'draft',
+    createdBy,
+    dispatchedAt: null,
+    deliveredAt: null,
+  });
+
+  await updateDoc(doc(db, 'orders', order.id), {
+    challanId,
+    updatedAt: serverTimestamp(),
+  });
+
+  return challanId;
+}
+
+export async function getOrderItemStockIssues(
+  items: Pick<OrderItem, 'productId' | 'productName' | 'quantity' | 'variantId'>[],
+): Promise<Array<{
+  productId: string;
+  productName: string;
+  variantId: string;
+  requestedQuantity: number;
+  stockQuantity: number;
+  reason: 'missing_product' | 'out_of_stock' | 'insufficient_stock';
+}>> {
+  const products = await Promise.all(items.map((item) => getProductById(item.productId)));
+  const issues: Array<{
+    productId: string;
+    productName: string;
+    variantId: string;
+    requestedQuantity: number;
+    stockQuantity: number;
+    reason: 'missing_product' | 'out_of_stock' | 'insufficient_stock';
+  }> = [];
+
+  items.forEach((item, index) => {
+    const product = products[index];
+
+    if (!product) {
+      issues.push({
+        productId: item.productId,
+        productName: item.productName,
+        variantId: item.variantId,
+        requestedQuantity: item.quantity,
+        stockQuantity: 0,
+        reason: 'missing_product',
+      });
+      return;
+    }
+
+    if (product.stockQuantity <= 0) {
+      issues.push({
+        productId: item.productId,
+        productName: item.productName,
+        variantId: item.variantId,
+        requestedQuantity: item.quantity,
+        stockQuantity: product.stockQuantity,
+        reason: 'out_of_stock',
+      });
+      return;
+    }
+
+    if (item.quantity > product.stockQuantity) {
+      issues.push({
+        productId: item.productId,
+        productName: item.productName,
+        variantId: item.variantId,
+        requestedQuantity: item.quantity,
+        stockQuantity: product.stockQuantity,
+        reason: 'insufficient_stock',
+      });
+    }
+  });
+
+  return issues;
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -298,9 +942,17 @@ export async function getDeliveryChallanById(id: string): Promise<DeliveryChalla
 }
 
 export async function getDeliveryChallansByOrderId(orderId: string): Promise<DeliveryChallan[]> {
-  const q = query(collection(db, 'deliveryChallans'), where('orderId', '==', orderId), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => normalizeDeliveryChallan(d.id, d.data()));
+  try {
+    const q = query(collection(db, 'deliveryChallans'), where('orderId', '==', orderId), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => normalizeDeliveryChallan(d.id, d.data()));
+  } catch {
+    const fallbackQ = query(collection(db, 'deliveryChallans'), where('orderId', '==', orderId));
+    const snap = await getDocs(fallbackQ);
+    return snap.docs
+      .map((d) => normalizeDeliveryChallan(d.id, d.data()))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
 }
 
 export async function updateDeliveryChallan(id: string, data: Partial<DeliveryChallan>): Promise<void> {

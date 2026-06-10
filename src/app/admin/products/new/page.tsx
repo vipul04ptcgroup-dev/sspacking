@@ -3,18 +3,23 @@
 import { useRouter } from 'next/navigation';
 import { createProduct } from '@/lib/firestore';
 import ProductForm from '@/components/admin/ProductForm';
+import { useAuth } from '@/context/auth-context';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import type { Product } from '@/types';
 
-type ProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+type ProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stockStatus'>;
 
 export default function NewProductPage() {
   const router = useRouter();
+  const { user } = useAuth();
 
   const handleSubmit = async (data: ProductPayload) => {
-    await createProduct(data);
+    await createProduct({
+      ...data,
+      lastStockUpdatedBy: user?.email || user?.uid || 'admin',
+    });
     toast.success('Product created!');
     router.push('/admin/products', { scroll: true });
   };

@@ -13,6 +13,15 @@ export interface ProductVariant {
   remark?: string;
 }
 
+export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock';
+export type InventoryTransactionType = 'IN' | 'OUT';
+export type InventoryTransactionSource =
+  | 'ADMIN_STOCK_ADD'
+  | 'WEBSITE_ORDER'
+  | 'MANUAL_SALE'
+  | 'ORDER_CANCELLATION'
+  | 'ORDER_REACTIVATION';
+
 export interface Product {
   id: string;
   name: string;
@@ -25,6 +34,11 @@ export interface Product {
   featured: boolean;
   active: boolean;
   hasVariants: boolean;
+  stockQuantity: number;
+  lowStockLimit: number;
+  stockStatus: StockStatus;
+  lastStockUpdatedAt?: Date | null;
+  lastStockUpdatedBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,18 +91,24 @@ export interface OrderItem {
 export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'dispatched' | 'shipped' | 'delivered' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type DeliveryChallanStatus = 'draft' | 'ready' | 'dispatched' | 'delivered' | 'cancelled';
+export type OrderSource = 'website_order' | 'manual_sale';
 
 export interface Order {
   id: string;
   userId: string;
   userEmail: string;
+  source?: OrderSource;
+  manualOrderId?: string;
   items: OrderItem[];
   shippingAddress: Address;
   subtotal: number;
+  discount?: number;
+  gst?: number;
   shippingCost: number;
   total: number;
   status: OrderStatus;
   challanId?: string;
+  stockRestoredOnCancel?: boolean;
   paymentStatus: PaymentStatus;
   paymentMethod: string;
   notes?: string;
@@ -111,12 +131,18 @@ export interface DeliveryChallan {
   id: string;
   challanNumber: string;
   orderId: string;
+  orderSource?: OrderSource;
+  manualOrderId?: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
   shippingAddress: Address;
   billingAddress: Address;
   products: OrderItem[];
+  subtotal?: number;
+  discount?: number;
+  gst?: number;
+  totalAmount?: number;
   remarks?: string;
   transportDetails: TransportDetails;
   consignmentImages: string[];
@@ -154,4 +180,20 @@ export interface QuoteRequest {
   message: string;
   status: 'new' | 'contacted' | 'quoted' | 'closed';
   createdAt: Date;
+}
+
+export interface InventoryTransaction {
+  id: string;
+  productId: string;
+  productName: string;
+  type: InventoryTransactionType;
+  source: InventoryTransactionSource;
+  orderId?: string;
+  manualOrderId?: string;
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  note?: string;
+  createdAt: Date;
+  createdBy: string;
 }

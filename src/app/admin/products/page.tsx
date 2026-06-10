@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getAllProducts, deleteProduct, updateProduct, getAllCategories } from '@/lib/firestore';
+import { backfillProductStockFields, getAllProducts, deleteProduct, updateProduct, getAllCategories } from '@/lib/firestore';
 import type { Product, Category } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import Button from '@/components/ui/Button';
@@ -24,6 +24,7 @@ export default function AdminProductsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
+    await backfillProductStockFields();
     const [p, c] = await Promise.all([getAllProducts(), getAllCategories()]);
     setProducts(p);
     setCategories(c);

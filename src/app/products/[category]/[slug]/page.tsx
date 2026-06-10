@@ -35,6 +35,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
   const selectedVariant: ProductVariant | null = product.variants[selectedVariantIndex] || null;
   const images = selectedVariant?.images?.length ? selectedVariant.images : (product.images || []);
   const hasSelectedVariantPrice = typeof selectedVariant?.price === 'number' && selectedVariant.price > 0;
+  const isOutOfStock = product.stockQuantity <= 0;
   const productUrl = `/products/${category}/${slug}`;
   const enquiryUrl = `/contact?product=${encodeURIComponent(product.name)}&variant=${encodeURIComponent(selectedVariant?.capacity || '')}&variantId=${encodeURIComponent(selectedVariant?.id || '')}&productUrl=${encodeURIComponent(productUrl)}#quote`;
 
@@ -93,6 +94,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ catego
           )}
 
           {hasSelectedVariantPrice && <p className="text-3xl font-black text-stone-900 mb-4">{formatPrice(selectedVariant!.price!)}</p>}
+
+          <div className="mb-4">
+            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+              product.stockStatus === 'out_of_stock'
+                ? 'bg-red-100 text-red-700'
+                : product.stockStatus === 'low_stock'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-green-100 text-green-700'
+            }`}>
+              {product.stockStatus === 'out_of_stock'
+                ? 'Out of stock'
+                : product.stockStatus === 'low_stock'
+                  ? 'In stock'
+                  : 'In stock'}
+            </span>
+            {isOutOfStock ? (
+              <p className="mt-2 text-sm font-medium text-red-600">This product is out of stock, so checkout is unavailable right now.</p>
+            ) : null}
+          </div>
 
           {selectedVariant && (
             <div className="grid grid-cols-2 gap-3 text-sm text-stone-600 mb-6">

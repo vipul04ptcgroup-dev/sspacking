@@ -41,12 +41,14 @@ const schema = z.object({
   featured: z.boolean(),
   active: z.boolean(),
   hasVariants: z.boolean(),
+  stockQuantity: z.coerce.number().min(0, 'Stock quantity cannot be negative'),
+  lowStockLimit: z.coerce.number().min(0, 'Low stock limit cannot be negative'),
   variants: z.array(variantSchema).optional(),
 });
 
 type FormInput = z.input<typeof schema>;
 type FormOutput = z.output<typeof schema>;
-type ProductFormValues = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+type ProductFormValues = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stockStatus'>;
 
 interface ProductFormProps {
   initialData?: Product;
@@ -94,8 +96,10 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
           featured: initialData.featured,
           active: initialData.active,
           hasVariants: initialData.hasVariants ?? (initialData.variants?.length || 0) > 0,
+          stockQuantity: initialData.stockQuantity ?? 1,
+          lowStockLimit: initialData.lowStockLimit ?? 0,
         }
-      : { active: true, featured: false, hasVariants: false, variants: [] },
+      : { active: true, featured: false, hasVariants: false, stockQuantity: 1, lowStockLimit: 0, variants: [] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
@@ -216,6 +220,25 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
             </label>
           </div>
           <Input label="Tags (comma-separated)" id="tags" placeholder="bamboo, eco, bottle" {...register('tags')} className="sm:col-span-2" />
+          <Input
+            label="Initial Stock Quantity *"
+            id="stockQuantity"
+            type="number"
+            min={0}
+            error={errors.stockQuantity?.message}
+            {...register('stockQuantity')}
+          />
+          <Input
+            label="Low Stock Limit *"
+            id="lowStockLimit"
+            type="number"
+            min={0}
+            error={errors.lowStockLimit?.message}
+            {...register('lowStockLimit')}
+          />
+          <p className="sm:col-span-2 text-xs text-stone-500">
+            Stock status is calculated automatically from stock quantity and low stock limit.
+          </p>
           <div className="flex items-center gap-6 sm:col-span-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" {...register('featured')} className="w-4 h-4 accent-amber-600" />

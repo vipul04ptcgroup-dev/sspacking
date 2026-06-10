@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCartStore } from '@/store/cart-store';
 import { useAuth } from '@/context/auth-context';
-import { createOrder } from '@/lib/firestore';
+import { createWebsiteOrderWithInventory, getOrderItemStockIssues } from '@/lib/firestore';
 import { formatPrice } from '@/lib/utils';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -34,6 +34,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, total, clearCart } = useCartStore();
   const [placing, setPlacing] = useState(false);
+  const [stockIssues, setStockIssues] = useState<string[]>([]);
   const cartTotal = total();
   const shippingCost = cartTotal >= 2000 ? 0 : 150;
 
@@ -41,6 +42,36 @@ export default function CheckoutPage() {
     resolver: zodResolver(schema),
     defaultValues: { email: user?.email || '' },
   });
+
+  useEffect(() => {
+    let mounted = true;
+
+    const validateStock = async () => {
+      if (!items.length) {
+        if (mounted) setStockIssues([]);
+        return;
+      }
+
+      const issues = await getOrderItemStockIssues(items);
+      if (!mounted) return;
+
+      setStockIssues(
+        issues.map((issue) =>
+          issue.reason === 'insufficient_stock'
+            ? `${issue.productName}: in stock`
+            : `${issue.productName}: out of stock`,
+        ),
+      );
+    };
+
+    void validateStock();
+
+    return () => {
+      mounted = false;
+    };
+  }, [items]);
+
+  const hasStockIssues = useMemo(() => stockIssues.length > 0, [stockIssues]);
 
   if (!items.length) {
     return (
@@ -56,7 +87,19 @@ export default function CheckoutPage() {
     if (!user) { router.push('/auth/login?redirect=/checkout'); return; }
     setPlacing(true);
     try {
-      const orderId = await createOrder({
+      const issues = await getOrderItemStockIssues(items);
+      if (issues.length > 0) {
+        setStockIssues(
+          issues.map((issue) =>
+            issue.reason === 'insufficient_stock'
+              ? `${issue.productName}: in stock`
+              : `${issue.productName}: out of stock`,
+          ),
+        );
+        throw new Error('Some products are no longer available for checkout.');
+      }
+
+      const orderId = await createWebsiteOrderWithInventory({
         userId: user.uid,
         userEmail: data.email,
         items: items.map(i => ({
@@ -80,7 +123,7 @@ export default function CheckoutPage() {
       toast.success('Order placed successfully!');
       router.push(`/account/orders?new=${orderId}`);
     } catch (err) {
-      toast.error('Failed to place order. Please try again.');
+      toast.error(err instanceof Error ? err.message : 'Failed to place order. Please try again.');
     } finally {
       setPlacing(false);
     }
@@ -95,6 +138,16 @@ export default function CheckoutPage() {
           <p className="text-sm text-amber-800">
             <Link href="/auth/login?redirect=/checkout" className="font-semibold underline">Login</Link> for a faster checkout experience and to track your orders.
           </p>
+        </div>
+      )}
+      {hasStockIssues && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-700">Checkout is unavailable for these items:</p>
+          <div className="mt-2 space-y-1 text-sm text-red-600">
+            {stockIssues.map((issue) => (
+              <p key={issue}>{issue}</p>
+            ))}
+          </div>
         </div>
       )}
 
@@ -163,7 +216,7 @@ export default function CheckoutPage() {
                   <span className="text-xl font-black text-stone-900">{formatPrice(cartTotal + shippingCost)}</span>
                 </div>
               </div>
-              <Button type="submit" loading={placing} size="lg" className="w-full mt-5">
+              <Button type="submit" loading={placing} size="lg" className="w-full mt-5" disabled={hasStockIssues}>
                 {placing ? 'Placing Order...' : 'Place Order'}
               </Button>
             </div>
