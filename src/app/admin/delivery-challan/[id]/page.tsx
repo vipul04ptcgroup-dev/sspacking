@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useAuth } from '@/context/auth-context';
 import {
   getDeliveryChallanById,
   markDeliveryChallanAsDelivered,
@@ -12,13 +13,16 @@ import {
 import { deleteImage, uploadDeliveryChallanImage } from '@/lib/storage';
 import type { DeliveryChallan, DeliveryChallanStatus } from '@/types';
 import { formatDate, formatPrice } from '@/lib/utils';
+import { createChallanPdfBlob, downloadChallanPdf } from '@/lib/challan-pdf';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { EmptyState, Spinner, Textarea } from '@/components/ui';
+import ChallanPdfPreview from '@/components/admin/ChallanPdfPreview';
 import {
   CalendarDays,
   ChevronRight,
   CircleDot,
+  Download,
   Eye,
   FileText,
   Image as ImageIcon,
@@ -90,6 +94,7 @@ function AddressBlock({
 
 export default function DeliveryChallanDetailPage() {
   const params = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [challan, setChallan] = useState<DeliveryChallan | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusUpdating, setStatusUpdating] = useState<DeliveryChallanStatus | null>(null);
@@ -98,6 +103,9 @@ export default function DeliveryChallanDetailPage() {
   const [deliveryRemarks, setDeliveryRemarks] = useState('');
   const [proofOfDeliveryImages, setProofOfDeliveryImages] = useState<string[]>([]);
   const [uploadingPodImages, setUploadingPodImages] = useState(false);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfAction, setPdfAction] = useState<'preview' | 'download' | 'print' | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -154,8 +162,86 @@ export default function DeliveryChallanDetailPage() {
     [challan],
   );
 
-  const handlePrint = () => {
-    window.print();
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
+
+  useEffect(() => {
+    setPdfUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+  }, [challan?.id, challan?.updatedAt?.getTime()]);
+
+  const ensurePdfUrl = async () => {
+    if (!challan) return null;
+    if (pdfUrl) return pdfUrl;
+
+    const blob = await createChallanPdfBlob(challan);
+    const nextUrl = URL.createObjectURL(blob);
+    setPdfUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return nextUrl;
+    });
+    return nextUrl;
+  };
+
+  const handlePreviewPdf = async () => {
+    if (!challan) return;
+
+    setPdfAction('preview');
+    try {
+      const nextUrl = await ensurePdfUrl();
+      if (!nextUrl) throw new Error('Unable to generate challan PDF.');
+      setPdfPreviewOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to generate PDF preview.');
+    } finally {
+      setPdfAction(null);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!challan) return;
+
+    setPdfAction('download');
+    try {
+      await downloadChallanPdf(challan);
+      toast.success('Challan PDF downloaded.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to download challan PDF.');
+    } finally {
+      setPdfAction(null);
+    }
+  };
+
+  const handlePrintPdf = async () => {
+    if (!challan) return;
+
+    setPdfAction('print');
+    try {
+      const nextUrl = await ensurePdfUrl();
+      if (!nextUrl) throw new Error('Unable to generate printable PDF.');
+
+      const printWindow = window.open(nextUrl, '_blank', 'noopener,noreferrer');
+      if (!printWindow) {
+        throw new Error('Popup blocked. Please allow popups to print the PDF.');
+      }
+
+      printWindow.focus();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to open printable PDF.');
+    } finally {
+      setPdfAction(null);
+    }
   };
 
   const handleEdit = () => {
@@ -209,7 +295,7 @@ export default function DeliveryChallanDetailPage() {
           receiverPhone,
           deliveryRemarks,
           proofOfDeliveryImages,
-        });
+        }, user?.email || user?.uid || 'admin');
 
         setChallan((current) =>
           current
@@ -232,7 +318,7 @@ export default function DeliveryChallanDetailPage() {
 
       const now =
         nextStatus === 'dispatched'
-          ? await markDeliveryChallanAsDispatched(challan.id)
+          ? await markDeliveryChallanAsDispatched(challan.id, user?.email || user?.uid || 'admin')
           : new Date();
 
       setChallan((current) =>
@@ -304,9 +390,17 @@ export default function DeliveryChallanDetailPage() {
               <Pencil className="h-4 w-4" />
               Edit
             </Button>
-            <Button type="button" variant="secondary" onClick={handlePrint}>
+            <Button type="button" variant="outline" onClick={() => void handlePreviewPdf()} loading={pdfAction === 'preview'}>
+              <Eye className="h-4 w-4" />
+              Preview PDF
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => void handleDownloadPdf()} loading={pdfAction === 'download'}>
+              <Download className="h-4 w-4" />
+              Download PDF
+            </Button>
+            <Button type="button" onClick={() => void handlePrintPdf()} loading={pdfAction === 'print'}>
               <Printer className="h-4 w-4" />
-              Print
+              Print PDF
             </Button>
             <Button
               type="button"
@@ -747,9 +841,29 @@ export default function DeliveryChallanDetailPage() {
                   <Pencil className="h-4 w-4" />
                   Edit
                 </Button>
-                <Button type="button" variant="secondary" onClick={handlePrint} className="w-full justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handlePreviewPdf()}
+                  loading={pdfAction === 'preview'}
+                  className="w-full justify-start"
+                >
+                  <Eye className="h-4 w-4" />
+                  Preview PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void handleDownloadPdf()}
+                  loading={pdfAction === 'download'}
+                  className="w-full justify-start"
+                >
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </Button>
+                <Button type="button" onClick={() => void handlePrintPdf()} loading={pdfAction === 'print'} className="w-full justify-start">
                   <Printer className="h-4 w-4" />
-                  Print
+                  Print PDF
                 </Button>
                 <Button
                   type="button"
@@ -777,6 +891,14 @@ export default function DeliveryChallanDetailPage() {
           </div>
         </div>
       </div>
+
+      <ChallanPdfPreview
+        open={pdfPreviewOpen}
+        pdfUrl={pdfUrl}
+        challanNumber={challan.challanNumber}
+        onClose={() => setPdfPreviewOpen(false)}
+        onPrint={() => void handlePrintPdf()}
+      />
 
       <div className="delivery-challan-print">
         <div className="print-sheet">

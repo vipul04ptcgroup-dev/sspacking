@@ -28,7 +28,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     await updateProduct(id, {
       ...data,
       lastStockUpdatedBy: user?.email || user?.uid || 'admin',
-    });
+    }, user?.email || user?.uid || 'admin');
     toast.success('Product updated!');
     router.push('/admin/products', { scroll: true });
   };

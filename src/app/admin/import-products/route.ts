@@ -263,6 +263,8 @@ export async function POST(request: Request) {
     const { adminDb } = getFirebaseAdmin();
     const formData = await request.formData();
     const file = formData.get('file');
+    const performedByValue = formData.get('performedBy');
+    const performedBy = typeof performedByValue === 'string' ? performedByValue.trim() : '';
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Missing JSON file in "file" field.' }, { status: 400 });
@@ -417,6 +419,26 @@ export async function POST(request: Request) {
         },
         { status: 400 },
       );
+    }
+
+    if (imported > 0) {
+      await adminDb.collection('adminActivityLogs').add({
+        action: 'import',
+        entity: 'product',
+        entityId: `import-${Date.now()}`,
+        entityLabel: file.name,
+        message: `Imported ${imported} product(s) from "${file.name}"`,
+        actorId: performedBy && !performedBy.includes('@') ? performedBy : '',
+        actorEmail: performedBy.includes('@') ? performedBy : '',
+        actorName: '',
+        metadata: {
+          fileName: file.name,
+          imported,
+          failed: errors.length,
+          warnings: warnings.length,
+        },
+        createdAt: FieldValue.serverTimestamp(),
+      });
     }
 
     return NextResponse.json({

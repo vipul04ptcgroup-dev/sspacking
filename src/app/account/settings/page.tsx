@@ -12,7 +12,7 @@ import { ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AccountSettingsPage() {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, isTeamMember } = useAuth();
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
@@ -20,7 +20,8 @@ export default function AccountSettingsPage() {
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login?redirect=/account/settings');
-  }, [loading, user, router]);
+    if (!loading && user && isTeamMember) router.push('/team');
+  }, [loading, user, router, isTeamMember]);
 
   useEffect(() => {
     if (!user) return;
@@ -29,6 +30,7 @@ export default function AccountSettingsPage() {
   }, [user, userProfile]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Spinner className="w-8 h-8" /></div>;
+  if (isTeamMember) return null;
   if (!user) return null;
 
   const onSave = async () => {

@@ -5,7 +5,8 @@ import { getAllOrders, updateOrderStatus } from '@/lib/firestore';
 import { useAuth } from '@/context/auth-context';
 import type { Order, OrderStatus } from '@/types';
 import { formatPrice, formatDate, ORDER_STATUS_COLORS } from '@/lib/utils';
-import { Spinner, EmptyState } from '@/components/ui';
+import { Spinner, EmptyState, Modal, Textarea } from '@/components/ui';
+import Button from '@/components/ui/Button';
 import { ShoppingBag, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,6 +26,10 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelNote, setCancelNote] = useState('');
 
   const load = async () => {
     const o = await getAllOrders();
@@ -34,10 +39,41 @@ export default function AdminOrdersPage() {
 
   useEffect(() => { load(); }, []);
 
+  const closeCancelModal = () => {
+    setCancelModalOpen(false);
+    setCancelTarget(null);
+    setCancelNote('');
+  };
+
+  const applyStatusChange = async (orderId: string, status: OrderStatus, cancellationNote?: string) => {
+    setStatusUpdatingId(orderId);
+    try {
+      await updateOrderStatus(orderId, status, user?.email || user?.uid || 'admin', cancellationNote);
+      toast.success(`Order status updated to ${status}`);
+      await load();
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
+
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    await updateOrderStatus(orderId, status, user?.email || user?.uid || 'admin');
-    toast.success(`Order status updated to ${status}`);
-    load();
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return;
+
+    if (status === 'cancelled') {
+      setCancelTarget(order);
+      setCancelNote(order.cancellationNote || '');
+      setCancelModalOpen(true);
+      return;
+    }
+
+    await applyStatusChange(orderId, status);
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!cancelTarget) return;
+    await applyStatusChange(cancelTarget.id, 'cancelled', cancelNote.trim());
+    closeCancelModal();
   };
 
   const filtered = filterStatus ? orders.filter(o => o.status === filterStatus) : orders;
@@ -86,6 +122,7 @@ export default function AdminOrdersPage() {
                     <select
                       value={order.status}
                       onChange={e => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                      disabled={statusUpdatingId === order.id}
                       className={`text-xs font-bold px-3 py-1.5 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer ${ORDER_STATUS_COLORS[order.status]}`}
                     >
                       {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -123,12 +160,49 @@ export default function AdminOrdersPage() {
                       </div>
                     </div>
                   </div>
+                  {order.cancellationNote ? (
+                    <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-red-700">Cancellation Note</p>
+                      <p className="mt-2 text-sm text-red-900">{order.cancellationNote}</p>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
           ))}
         </div>
       )}
+      <Modal
+        open={cancelModalOpen}
+        onClose={closeCancelModal}
+        title={cancelTarget ? `Cancel Order #${cancelTarget.id.slice(-8).toUpperCase()}` : 'Cancel Order'}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-stone-600">
+            Add a cancellation note for this order. This note will be saved in Firebase and shown in the order details.
+          </p>
+          <Textarea
+            id="orderCancellationNote"
+            label="Cancellation Note"
+            value={cancelNote}
+            onChange={(event) => setCancelNote(event.target.value)}
+            placeholder="Why was this order cancelled?"
+          />
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => void handleConfirmCancellation()}
+              loading={statusUpdatingId === cancelTarget?.id}
+            >
+              Confirm Cancellation
+            </Button>
+            <Button type="button" variant="ghost" onClick={closeCancelModal}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

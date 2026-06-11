@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { deleteQuoteRequest, getAllQuotes } from '@/lib/firestore';
+import { useAuth } from '@/context/auth-context';
 import type { QuoteRequest } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { Spinner, EmptyState } from '@/components/ui';
@@ -16,6 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AdminQuotesPage() {
+  const { user } = useAuth();
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export default function AdminQuotesPage() {
 
     setDeletingId(quote.id);
     try {
-      await deleteQuoteRequest(quote.id);
+      await deleteQuoteRequest(quote.id, user?.email || user?.uid || 'admin');
       setQuotes(prev => prev.filter(q => q.id !== quote.id));
     } finally {
       setDeletingId(null);

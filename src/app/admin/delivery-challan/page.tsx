@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/context/auth-context';
 import {
   deleteDeliveryChallan,
   getAllDeliveryChallans,
@@ -41,6 +42,7 @@ const STATUS_STYLES: Record<DeliveryChallanStatus, string> = {
 };
 
 export default function AdminDeliveryChallanPage() {
+  const { user } = useAuth();
   const [challans, setChallans] = useState<DeliveryChallan[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -85,7 +87,7 @@ export default function AdminDeliveryChallanPage() {
 
     setDeletingId(challan.id);
     try {
-      await deleteDeliveryChallan(challan.id);
+      await deleteDeliveryChallan(challan.id, user?.email || user?.uid || 'admin');
       setChallans((current) => current.filter((item) => item.id !== challan.id));
       toast.success(`Deleted ${challan.challanNumber}`);
     } catch {

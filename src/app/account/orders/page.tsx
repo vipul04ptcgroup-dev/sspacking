@@ -11,19 +11,21 @@ import { Spinner, EmptyState } from '@/components/ui';
 import { Package, ChevronRight } from 'lucide-react';
 
 export default function OrdersPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, isTeamMember } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) { router.push('/auth/login?redirect=/account/orders'); return; }
+    if (!loading && user && isTeamMember) { router.push('/team'); return; }
     if (user) {
       getUserOrders(user.uid).then(o => { setOrders(o); setOrdersLoading(false); });
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, isTeamMember]);
 
   if (loading || ordersLoading) return <div className="min-h-screen flex items-center justify-center"><Spinner className="w-8 h-8" /></div>;
+  if (isTeamMember) return null;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

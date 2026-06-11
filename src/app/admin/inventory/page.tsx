@@ -301,7 +301,7 @@ export default function AdminInventoryPage() {
             />
           ) : (
             <div className="space-y-3">
-              {transactions.slice(0, 8).map((transaction) => (
+              {transactions.slice(0, 5).map((transaction) => (
                 <div key={transaction.id} className="rounded-xl border border-stone-100 bg-stone-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>

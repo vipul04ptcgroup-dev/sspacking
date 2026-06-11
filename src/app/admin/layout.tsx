@@ -7,19 +7,52 @@ import { useAuth } from '@/context/auth-context';
 import { Spinner } from '@/components/ui';
 import {
   LayoutDashboard, Package, ShoppingBag, Tags, Users, MessageSquare,
-  ArrowLeft, Menu, FileText, Boxes, ReceiptText,
+  ArrowLeft, Menu, FileText, Boxes, ReceiptText, History, ShieldUser, ClipboardList,
 } from 'lucide-react';
 
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
-  { icon: Package, label: 'Products', href: '/admin/products' },
-  { icon: Boxes, label: 'Inventory', href: '/admin/inventory' },
-  { icon: Tags, label: 'Categories', href: '/admin/categories' },
-  { icon: ShoppingBag, label: 'Orders', href: '/admin/orders' },
-  { icon: ReceiptText, label: 'Sales', href: '/admin/sales' },
-  { icon: FileText, label: 'Delivery Challan', href: '/admin/delivery-challan' },
-  { icon: Users, label: 'Customers', href: '/admin/users' },
-  { icon: MessageSquare, label: 'Quote Requests', href: '/admin/quotes' },
+const navSections = [
+  {
+    title: 'Overview',
+    items: [
+      { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
+    ],
+  },
+  {
+    title: 'Catalog',
+    items: [
+      { icon: Package, label: 'Products', href: '/admin/products' },
+      { icon: Boxes, label: 'Inventory', href: '/admin/inventory' },
+      { icon: Tags, label: 'Categories', href: '/admin/categories' },
+    ],
+  },
+  {
+    title: 'Sales',
+    items: [
+      { icon: ShoppingBag, label: 'Orders', href: '/admin/orders' },
+      { icon: ReceiptText, label: 'Sales', href: '/admin/sales' },
+      { icon: FileText, label: 'Delivery Challan', href: '/admin/delivery-challan' },
+    ],
+  },
+  {
+    title: 'Engagement',
+    items: [
+      { icon: MessageSquare, label: 'Quote Requests', href: '/admin/quotes' },
+    ],
+  },
+  {
+    title: 'Users',
+    items: [
+      { icon: Users, label: 'Customers', href: '/admin/users' },
+      { icon: ShieldUser, label: 'Team Members', href: '/admin/team' },
+    ],
+  },
+  {
+    title: 'Systems',
+    items: [
+      { icon: History, label: 'Admin Logs', href: '/admin/logs' },
+      { icon: ClipboardList, label: 'Team Logs', href: '/admin/team-logs' },
+    ],
+  },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -54,25 +87,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
         </div>
 
-        <nav className="p-3 space-y-1">
-          {navItems.map(item => {
-            const active = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
-                  active
-                    ? 'bg-amber-600 text-white'
-                    : 'text-stone-400 hover:bg-stone-800 hover:text-white'
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="p-3 space-y-4 pb-24">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
+                {section.title}
+              </p>
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const active = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href));
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                        active
+                          ? 'bg-amber-600 text-white'
+                          : 'text-stone-400 hover:bg-stone-800 hover:text-white'
+                      }`}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="absolute bottom-5 left-3 right-3">

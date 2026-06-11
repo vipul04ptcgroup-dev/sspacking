@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { backfillProductStockFields, getAllProducts, deleteProduct, updateProduct, getAllCategories } from '@/lib/firestore';
+import { useAuth } from '@/context/auth-context';
 import type { Product, Category } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import Button from '@/components/ui/Button';
@@ -12,6 +13,7 @@ import { Plus, Pencil, Trash2, Package, Eye, EyeOff, Upload } from 'lucide-react
 import toast from 'react-hot-toast';
 
 export default function AdminProductsPage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function AdminProductsPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    await deleteProduct(id);
+    await deleteProduct(id, user?.email || user?.uid || 'admin');
     toast.success('Product deleted');
     setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
     load();
@@ -67,7 +69,7 @@ export default function AdminProductsPage() {
 
     setBulkDeleting(true);
     try {
-      await Promise.all(idsToDelete.map((id) => deleteProduct(id)));
+      await Promise.all(idsToDelete.map((id) => deleteProduct(id, user?.email || user?.uid || 'admin')));
       toast.success(`Deleted ${idsToDelete.length} product(s)`);
       setSelectedIds((prev) => prev.filter((id) => !idsToDelete.includes(id)));
       await load();
@@ -79,7 +81,7 @@ export default function AdminProductsPage() {
   };
 
   const toggleActive = async (product: Product) => {
-    await updateProduct(product.id, { active: !product.active });
+    await updateProduct(product.id, { active: !product.active }, user?.email || user?.uid || 'admin');
     toast.success(`Product ${product.active ? 'hidden' : 'shown'}`);
     load();
   };
@@ -98,6 +100,7 @@ export default function AdminProductsPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('performedBy', user?.email || user?.uid || 'admin');
 
       const response = await fetch('/admin/import-products', {
         method: 'POST',

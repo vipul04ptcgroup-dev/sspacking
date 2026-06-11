@@ -428,7 +428,7 @@ export default function AdminSalesPage() {
               />
             ) : (
               <div className="space-y-3">
-                {manualSales.slice(0, 8).map((order) => (
+                {manualSales.slice(0, 5).map((order) => (
                   <div key={order.id} className="rounded-xl border border-stone-100 bg-stone-50 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>

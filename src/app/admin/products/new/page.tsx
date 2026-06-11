@@ -19,7 +19,7 @@ export default function NewProductPage() {
     await createProduct({
       ...data,
       lastStockUpdatedBy: user?.email || user?.uid || 'admin',
-    });
+    }, user?.email || user?.uid || 'admin');
     toast.success('Product created!');
     router.push('/admin/products', { scroll: true });
   };

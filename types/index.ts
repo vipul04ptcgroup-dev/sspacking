@@ -112,6 +112,7 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paymentMethod: string;
   notes?: string;
+  cancellationNote?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -168,6 +169,31 @@ export interface User {
   createdAt: Date;
 }
 
+export interface TeamMember {
+  id: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  active: boolean;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastLoginAt?: Date | null;
+  lastLogoutAt?: Date | null;
+}
+
+export type TeamAccessLogType = 'login' | 'logout';
+
+export interface TeamAccessLog {
+  id: string;
+  teamMemberId: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  type: TeamAccessLogType;
+  createdAt: Date;
+}
+
 export interface QuoteRequest {
   id: string;
   name: string;
@@ -196,4 +222,37 @@ export interface InventoryTransaction {
   note?: string;
   createdAt: Date;
   createdBy: string;
+}
+
+export type AdminActivityAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'status_change'
+  | 'stock_add'
+  | 'import'
+  | 'manual_sale';
+
+export type AdminActivityEntity =
+  | 'product'
+  | 'category'
+  | 'order'
+  | 'inventory'
+  | 'delivery_challan'
+  | 'quote'
+  | 'manual_sale'
+  | 'team_member';
+
+export interface AdminActivityLog {
+  id: string;
+  action: AdminActivityAction;
+  entity: AdminActivityEntity;
+  entityId: string;
+  entityLabel: string;
+  message: string;
+  actorId: string;
+  actorEmail: string;
+  actorName: string;
+  createdAt: Date;
+  metadata?: Record<string, string | number | boolean | null>;
 }

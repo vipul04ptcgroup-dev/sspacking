@@ -7,14 +7,16 @@ import {
   GoogleAuthProvider, signInWithPopup
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getUserProfile, createUserProfile } from '@/lib/firestore';
-import type { User } from '@/types';
+import { getUserProfile, createUserProfile, getTeamMemberProfile } from '@/lib/firestore';
+import type { TeamMember, User } from '@/types';
 
 interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: User | null;
+  teamProfile: TeamMember | null;
   loading: boolean;
   isAdmin: boolean;
+  isTeamMember: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -26,6 +28,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [teamProfile, setTeamProfile] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,8 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         const profile = await getUserProfile(firebaseUser.uid);
         setUserProfile(profile);
+        setTeamProfile(profile ? null : await getTeamMemberProfile(firebaseUser.uid));
       } else {
         setUserProfile(null);
+        setTeamProfile(null);
       }
       setLoading(false);
     });
@@ -76,9 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isAdmin = userProfile?.role === 'admin';
+  const isTeamMember = Boolean(teamProfile?.active);
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, isAdmin, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, userProfile, teamProfile, loading, isAdmin, isTeamMember, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

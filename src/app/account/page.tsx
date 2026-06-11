@@ -14,7 +14,7 @@ import { Spinner } from '@/components/ui';
 import type { Order } from '@/types';
 
 export default function AccountPage() {
-  const { user, userProfile, loading, logout } = useAuth();
+  const { user, userProfile, loading, logout, isTeamMember } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -25,7 +25,8 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login?redirect=/account');
-  }, [user, loading, router]);
+    if (!loading && user && isTeamMember) router.push('/team');
+  }, [user, loading, router, isTeamMember]);
 
   useEffect(() => {
     if (!user) return;
@@ -42,6 +43,7 @@ export default function AccountPage() {
   }, [user]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Spinner className="w-8 h-8" /></div>;
+  if (isTeamMember) return null;
   if (!user) return null;
 
   const totalSpent = orders.reduce((sum, o) => sum + o.total, 0);

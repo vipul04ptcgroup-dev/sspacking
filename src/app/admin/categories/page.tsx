@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAllCategories, createCategory, updateCategory, deleteCategory } from '@/lib/firestore';
+import { useAuth } from '@/context/auth-context';
 import { uploadCategoryImage } from '@/lib/storage';
 import type { Category } from '@/types';
 import { slugify } from '@/lib/utils';
@@ -16,6 +17,7 @@ import Image from 'next/image';
 const emptyForm = { name: '', slug: '', description: '', image: '', order: 0, active: true };
 
 export default function AdminCategoriesPage() {
+  const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,10 +42,10 @@ export default function AdminCategoriesPage() {
     setSaving(true);
     try {
       if (editing) {
-        await updateCategory(editing.id, form);
+        await updateCategory(editing.id, form, user?.email || user?.uid || 'admin');
         toast.success('Category updated!');
       } else {
-        await createCategory(form as Omit<Category, 'id'>);
+        await createCategory(form as Omit<Category, 'id'>, user?.email || user?.uid || 'admin');
         toast.success('Category created!');
       }
       setModalOpen(false);
@@ -54,7 +56,7 @@ export default function AdminCategoriesPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete category "${name}"?`)) return;
-    await deleteCategory(id);
+    await deleteCategory(id, user?.email || user?.uid || 'admin');
     toast.success('Category deleted');
     load();
   };
