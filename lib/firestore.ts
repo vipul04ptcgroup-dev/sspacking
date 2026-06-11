@@ -20,6 +20,7 @@ import type {
 } from '@/types';
 
 const DEFAULT_INITIAL_STOCK_QUANTITY = 1;
+const DEFAULT_LOW_STOCK_LIMIT = 1000;
 
 type AdminActivityActor = {
   uid?: string;
@@ -62,9 +63,13 @@ function sanitizeStockValue(value: unknown, fallback = 0): number {
   return Math.max(0, Math.floor(value));
 }
 
+function sanitizeLowStockLimit(value: unknown, fallback = DEFAULT_LOW_STOCK_LIMIT): number {
+  return Math.max(DEFAULT_LOW_STOCK_LIMIT, sanitizeStockValue(value, fallback));
+}
+
 export function calculateStockStatus(stockQuantity: number, lowStockLimit: number): Product['stockStatus'] {
   if (stockQuantity <= 0) return 'out_of_stock';
-  if (stockQuantity <= lowStockLimit) return 'low_stock';
+  if (stockQuantity < lowStockLimit) return 'low_stock';
   return 'in_stock';
 }
 
@@ -73,7 +78,10 @@ function resolveProductStockFields(data: Partial<Product>, fallback?: Partial<Pr
     data.stockQuantity ?? fallback?.stockQuantity,
     DEFAULT_INITIAL_STOCK_QUANTITY,
   );
-  const lowStockLimit = sanitizeStockValue(data.lowStockLimit ?? fallback?.lowStockLimit);
+  const lowStockLimit = sanitizeLowStockLimit(
+    data.lowStockLimit ?? fallback?.lowStockLimit,
+    DEFAULT_LOW_STOCK_LIMIT,
+  );
 
   return {
     stockQuantity,
@@ -111,10 +119,10 @@ function normalizeProduct(id: string, data: Record<string, unknown>): Product {
     active: Boolean(data.active),
     hasVariants: typeof data.hasVariants === 'boolean' ? data.hasVariants : variants.length > 0,
     stockQuantity: sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
-    lowStockLimit: sanitizeStockValue(data.lowStockLimit),
+    lowStockLimit: sanitizeLowStockLimit(data.lowStockLimit, DEFAULT_LOW_STOCK_LIMIT),
     stockStatus: calculateStockStatus(
       sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
-      sanitizeStockValue(data.lowStockLimit),
+      sanitizeLowStockLimit(data.lowStockLimit, DEFAULT_LOW_STOCK_LIMIT),
     ),
     lastStockUpdatedAt: (data.lastStockUpdatedAt as any)?.toDate?.() ?? null,
     lastStockUpdatedBy: (data.lastStockUpdatedBy as string) || '',
@@ -401,11 +409,21 @@ export async function backfillProductStockFields(): Promise<number> {
     const hasStockStatus = typeof data.stockStatus === 'string';
     const hasLastStockUpdatedAt = 'lastStockUpdatedAt' in data;
     const hasLastStockUpdatedBy = typeof data.lastStockUpdatedBy === 'string';
+    const currentLowStockLimit = sanitizeLowStockLimit(data.lowStockLimit, DEFAULT_LOW_STOCK_LIMIT);
+    const currentStockQuantity = sanitizeStockValue(
+      data.stockQuantity,
+      DEFAULT_INITIAL_STOCK_QUANTITY,
+    );
+    const currentStockStatus = calculateStockStatus(currentStockQuantity, currentLowStockLimit);
     const isLegacyAutoZeroedStock =
       hasStockQuantity &&
       sanitizeStockValue(data.stockQuantity) === 0 &&
       data.lastStockUpdatedAt == null &&
       ((data.lastStockUpdatedBy as string) || '') === '';
+    const needsLowStockLimitUpgrade =
+      !hasLowStockLimit || sanitizeStockValue(data.lowStockLimit) < DEFAULT_LOW_STOCK_LIMIT;
+    const needsStockStatusRefresh =
+      !hasStockStatus || (data.stockStatus as string) !== currentStockStatus;
 
     if (
       hasStockQuantity &&
@@ -413,6 +431,8 @@ export async function backfillProductStockFields(): Promise<number> {
       hasStockStatus &&
       hasLastStockUpdatedAt &&
       hasLastStockUpdatedBy &&
+      !needsLowStockLimitUpgrade &&
+      !needsStockStatusRefresh &&
       !isLegacyAutoZeroedStock
     ) {
       return;
@@ -422,7 +442,7 @@ export async function backfillProductStockFields(): Promise<number> {
       stockQuantity: isLegacyAutoZeroedStock
         ? DEFAULT_INITIAL_STOCK_QUANTITY
         : sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
-      lowStockLimit: sanitizeStockValue(data.lowStockLimit),
+      lowStockLimit: sanitizeLowStockLimit(data.lowStockLimit, DEFAULT_LOW_STOCK_LIMIT),
     });
 
     batch.update(productDoc.ref, {

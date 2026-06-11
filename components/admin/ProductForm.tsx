@@ -42,7 +42,7 @@ const schema = z.object({
   active: z.boolean(),
   hasVariants: z.boolean(),
   stockQuantity: z.coerce.number().min(0, 'Stock quantity cannot be negative'),
-  lowStockLimit: z.coerce.number().min(0, 'Low stock limit cannot be negative'),
+  lowStockLimit: z.coerce.number().min(1000, 'Low stock limit must be at least 1000'),
   variants: z.array(variantSchema).optional(),
 });
 
@@ -97,9 +97,9 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
           active: initialData.active,
           hasVariants: initialData.hasVariants ?? (initialData.variants?.length || 0) > 0,
           stockQuantity: initialData.stockQuantity ?? 1,
-          lowStockLimit: initialData.lowStockLimit ?? 0,
+          lowStockLimit: initialData.lowStockLimit ?? 1000,
         }
-      : { active: true, featured: false, hasVariants: false, stockQuantity: 1, lowStockLimit: 0, variants: [] },
+      : { active: true, featured: false, hasVariants: false, stockQuantity: 1, lowStockLimit: 1000, variants: [] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
@@ -232,7 +232,7 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
             label="Low Stock Limit *"
             id="lowStockLimit"
             type="number"
-            min={0}
+            min={1000}
             error={errors.lowStockLimit?.message}
             {...register('lowStockLimit')}
           />

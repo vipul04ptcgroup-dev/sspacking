@@ -74,7 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {sidebarOpen && <div className="admin-mobile-overlay fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <aside className={`admin-sidebar fixed top-0 left-0 w-64 bg-stone-900 z-30 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static`}>
+      <aside className={`admin-sidebar fixed top-0 left-0 z-30 flex h-screen w-64 flex-col overflow-hidden bg-stone-900 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="p-5 border-b border-stone-800">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-9 h-9 bg-amber-500 rounded-xl flex items-center justify-center">
@@ -87,7 +87,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
         </div>
 
-        <nav className="p-3 space-y-4 pb-24">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
           {navSections.map((section) => (
             <div key={section.title}>
               <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
@@ -117,7 +117,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
 
-        <div className="absolute bottom-5 left-3 right-3">
+        <div className="border-t border-stone-800 p-3">
           <Link href="/" className="flex items-center gap-2 px-4 py-2.5 text-stone-500 hover:text-white text-sm transition rounded-xl hover:bg-stone-800">
             <ArrowLeft className="w-4 h-4" /> Back to Store
           </Link>
@@ -125,7 +125,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 lg:ml-64">
         {/* Top bar (mobile) */}
         <div className="admin-mobile-bar lg:hidden sticky top-0 z-10 bg-white border-b border-stone-200 px-4 h-14 flex items-center gap-3">
           <button onClick={() => setSidebarOpen(true)} className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg">
