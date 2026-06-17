@@ -17,6 +17,10 @@ export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock';
 export type InventoryTransactionType = 'IN' | 'OUT';
 export type InventoryTransactionSource =
   | 'ADMIN_STOCK_ADD'
+  | 'PURCHASE'
+  | 'PURCHASE_EDIT'
+  | 'PURCHASE_DELETE'
+  | 'PRODUCTION'
   | 'WEBSITE_ORDER'
   | 'MANUAL_SALE'
   | 'ORDER_CANCELLATION'
@@ -224,6 +228,60 @@ export interface InventoryTransaction {
   createdBy: string;
 }
 
+export interface Supplier {
+  id: string;
+  supplierName: string;
+  contactPerson: string;
+  mobile: string;
+  email: string;
+  address: string;
+  gstNumber: string;
+  status: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Material {
+  id: string;
+  name: string;
+  stock: number;
+  status: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PurchaseItem {
+  id: string;
+  purchaseId: string;
+  productId: string;
+  quantity: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Purchase {
+  id: string;
+  purchaseNumber: string;
+  supplierId: string;
+  purchaseDate: Date;
+  totalQty: number;
+  remarks: string;
+  createdBy: string;
+  itemCount?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface StockTransaction {
+  id: string;
+  productId: string;
+  referenceType: 'purchase';
+  referenceId: string;
+  quantity: number;
+  transactionType: InventoryTransactionType;
+  createdAt: Date;
+}
+
 export type AdminActivityAction =
   | 'create'
   | 'update'
@@ -238,6 +296,9 @@ export type AdminActivityEntity =
   | 'category'
   | 'order'
   | 'inventory'
+  | 'material'
+  | 'supplier'
+  | 'purchase'
   | 'delivery_challan'
   | 'quote'
   | 'manual_sale'

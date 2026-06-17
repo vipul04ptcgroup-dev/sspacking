@@ -135,7 +135,7 @@ export default function AdminInventoryPage() {
         <div>
           <h1 className="text-3xl font-black text-stone-900">Inventory</h1>
           <p className="mt-1 text-stone-500">
-            Track stock levels, add fresh inventory, and review stock movement history.
+            Track stock levels, apply manual stock-ins, and review purchase and order movement history.
           </p>
         </div>
       </div>
@@ -285,7 +285,7 @@ export default function AdminInventoryPage() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-stone-900">Recent Stock Movements</h2>
-              <p className="text-sm text-stone-500">Latest inventory updates recorded in Firebase.</p>
+              <p className="text-sm text-stone-500">Latest inventory updates recorded from purchases, manual stock-ins, and orders.</p>
             </div>
           </div>
 
@@ -297,7 +297,7 @@ export default function AdminInventoryPage() {
             <EmptyState
               icon={<History className="h-14 w-14" />}
               title="No inventory transactions yet"
-              description="Stock additions and website order deductions will appear here."
+              description="Purchase receipts, stock additions, and order deductions will appear here."
             />
           ) : (
             <div className="space-y-3">
@@ -420,7 +420,7 @@ export default function AdminInventoryPage() {
       <div className="mt-8 rounded-2xl border border-stone-100 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-stone-100 bg-stone-50 px-5 py-4">
           <h2 className="text-lg font-bold text-stone-900">Inventory Transaction History</h2>
-          <p className="text-sm text-stone-500">Complete movement log for manual stock additions and website deductions.</p>
+          <p className="text-sm text-stone-500">Complete movement log for purchases, manual stock additions, and order deductions.</p>
         </div>
 
         {loading ? (

@@ -10,6 +10,7 @@ import type {
   OrderItem,
   AdminActivityLog,
   InventoryTransaction,
+  InventoryTransactionSource,
   TeamAccessLog,
   TeamMember,
   User,
@@ -17,6 +18,11 @@ import type {
   OrderStatus,
   DeliveryChallan,
   DeliveryChallanStatus,
+  Material,
+  Supplier,
+  Purchase,
+  PurchaseItem,
+  StockTransaction,
 } from '@/types';
 
 const DEFAULT_INITIAL_STOCK_QUANTITY = 1;
@@ -210,6 +216,72 @@ function normalizeInventoryTransaction(id: string, data: Record<string, unknown>
   };
 }
 
+function normalizeSupplier(id: string, data: Record<string, unknown>): Supplier {
+  return {
+    id,
+    supplierName: (data.supplierName as string) || '',
+    contactPerson: (data.contactPerson as string) || '',
+    mobile: (data.mobile as string) || '',
+    email: (data.email as string) || '',
+    address: (data.address as string) || '',
+    gstNumber: (data.gstNumber as string) || '',
+    status: typeof data.status === 'boolean' ? data.status : true,
+    createdAt: toDateOrNow(data.createdAt),
+    updatedAt: toDateOrNow(data.updatedAt),
+  };
+}
+
+function normalizeMaterial(id: string, data: Record<string, unknown>): Material {
+  const rawName = data.name || data.materialName || data.title;
+
+  return {
+    id,
+    name: typeof rawName === 'string' ? rawName.trim() : '',
+    stock: sanitizeStockValue(data.stock),
+    status: typeof data.status === 'boolean' ? data.status : true,
+    createdAt: toDateOrNow(data.createdAt),
+    updatedAt: toDateOrNow(data.updatedAt),
+  };
+}
+
+function normalizePurchase(id: string, data: Record<string, unknown>): Purchase {
+  return {
+    id,
+    purchaseNumber: (data.purchaseNumber as string) || '',
+    supplierId: (data.supplierId as string) || '',
+    purchaseDate: toDateOrNow(data.purchaseDate),
+    totalQty: typeof data.totalQty === 'number' ? data.totalQty : 0,
+    remarks: (data.remarks as string) || '',
+    createdBy: (data.createdBy as string) || '',
+    itemCount: typeof data.itemCount === 'number' ? data.itemCount : undefined,
+    createdAt: toDateOrNow(data.createdAt),
+    updatedAt: toDateOrNow(data.updatedAt),
+  };
+}
+
+function normalizePurchaseItem(id: string, data: Record<string, unknown>): PurchaseItem {
+  return {
+    id,
+    purchaseId: (data.purchaseId as string) || '',
+    productId: (data.productId as string) || '',
+    quantity: typeof data.quantity === 'number' ? data.quantity : 0,
+    createdAt: toDateOrNow(data.createdAt),
+    updatedAt: toDateOrNow(data.updatedAt),
+  };
+}
+
+function normalizeStockTransaction(id: string, data: Record<string, unknown>): StockTransaction {
+  return {
+    id,
+    productId: (data.productId as string) || '',
+    referenceType: (data.referenceType as StockTransaction['referenceType']) || 'purchase',
+    referenceId: (data.referenceId as string) || '',
+    quantity: sanitizeStockValue(data.quantity),
+    transactionType: (data.transactionType as StockTransaction['transactionType']) || 'IN',
+    createdAt: toDateOrNow(data.createdAt),
+  };
+}
+
 function normalizeAdminActivityLog(id: string, data: Record<string, unknown>): AdminActivityLog {
   const metadataValue = data.metadata;
   const safeMetadata =
@@ -302,6 +374,62 @@ async function getLatestDeliveryChallanSequence(): Promise<number> {
   if (snap.empty) return 0;
   const latest = snap.docs[0].data();
   return parseDeliveryChallanSequence(latest.challanNumber as string | undefined);
+}
+
+function parsePurchaseSequence(purchaseNumber: string | undefined): number {
+  if (!purchaseNumber) return 0;
+  const match = purchaseNumber.match(/^PUR-(\d+)$/i);
+  if (!match) return 0;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatPurchaseNumber(sequence: number): string {
+  return `PUR-${String(sequence).padStart(4, '0')}`;
+}
+
+async function getLatestPurchaseSequence(): Promise<number> {
+  const q = query(collection(db, 'purchases'), orderBy('createdAt', 'desc'), limit(1));
+  const snap = await getDocs(q);
+  if (snap.empty) return 0;
+  const latest = snap.docs[0].data();
+  return parsePurchaseSequence(latest.purchaseNumber as string | undefined);
+}
+
+function sanitizePurchaseItems(
+  items: Array<Pick<PurchaseItem, 'productId' | 'quantity'>>,
+): Array<Pick<PurchaseItem, 'productId' | 'quantity'>> {
+  return items
+    .map((item) => ({
+      productId: item.productId,
+      quantity: sanitizeStockValue(item.quantity),
+    }))
+    .filter((item) => item.productId && item.quantity > 0);
+}
+
+function aggregatePurchaseItems(
+  items: Array<Pick<PurchaseItem, 'productId' | 'quantity'>>,
+): Array<Pick<PurchaseItem, 'productId' | 'quantity'>> {
+  const aggregated = new Map<string, number>();
+
+  items.forEach((item) => {
+    aggregated.set(item.productId, (aggregated.get(item.productId) || 0) + sanitizeStockValue(item.quantity));
+  });
+
+  return Array.from(aggregated.entries()).map(([productId, quantity]) => ({
+    productId,
+    quantity,
+  }));
+}
+
+function getPurchaseEmbeddedItems(data: Record<string, unknown>): Array<Pick<PurchaseItem, 'productId' | 'quantity'>> {
+  if (!Array.isArray(data.items)) return [];
+  return sanitizePurchaseItems(
+    data.items.map((item) => ({
+      productId: (item as Record<string, unknown>).productId as string,
+      quantity: ((item as Record<string, unknown>).quantity as number) || 0,
+    })),
+  );
 }
 
 // ─── Categories ───────────────────────────────────────────────────────────────
@@ -595,6 +723,628 @@ export async function deleteProduct(id: string, actor?: string | AdminActivityAc
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
+
+export async function getAllSuppliers(): Promise<Supplier[]> {
+  const q = query(collection(db, 'suppliers'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((docSnap) => normalizeSupplier(docSnap.id, docSnap.data()));
+}
+
+export async function getAllMaterials(): Promise<Material[]> {
+  const q = query(collection(db, 'materials'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((docSnap) => normalizeMaterial(docSnap.id, docSnap.data()));
+}
+
+export async function getMaterialById(id: string): Promise<Material | null> {
+  const snap = await getDoc(doc(db, 'materials', id));
+  if (!snap.exists()) return null;
+  return normalizeMaterial(snap.id, snap.data());
+}
+
+export async function createMaterial(
+  data: Omit<Material, 'id' | 'createdAt' | 'updatedAt'>,
+  actor?: string | AdminActivityActor,
+): Promise<string> {
+  const materialName = data.name.trim();
+  const ref = await addDoc(collection(db, 'materials'), {
+    name: materialName,
+    stock: sanitizeStockValue(data.stock),
+    status: data.status,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await logAdminActivity({
+    action: 'create',
+    entity: 'material',
+    entityId: ref.id,
+    entityLabel: materialName,
+    message: `Created material "${materialName}"`,
+    actor,
+    metadata: {
+      stock: sanitizeStockValue(data.stock),
+      active: data.status,
+    },
+  });
+
+  return ref.id;
+}
+
+export async function updateMaterial(
+  id: string,
+  data: Partial<Omit<Material, 'id' | 'createdAt' | 'updatedAt'>>,
+  actor?: string | AdminActivityActor,
+): Promise<void> {
+  const existing = await getMaterialById(id);
+  if (!existing) {
+    throw new Error('Material not found.');
+  }
+
+  await updateDoc(doc(db, 'materials', id), {
+    ...data,
+    ...(typeof data.name === 'string' ? { name: data.name.trim() } : {}),
+    ...(typeof data.stock === 'number' ? { stock: sanitizeStockValue(data.stock) } : {}),
+    updatedAt: serverTimestamp(),
+  });
+
+  await logAdminActivity({
+    action: 'update',
+    entity: 'material',
+    entityId: id,
+    entityLabel: data.name?.trim() || existing.name,
+    message: `Updated material "${data.name?.trim() || existing.name}"`,
+    actor,
+    metadata: {
+      updatedFields: Object.keys(data).join(', ') || 'none',
+      stock: typeof data.stock === 'number' ? sanitizeStockValue(data.stock) : null,
+      active: typeof data.status === 'boolean' ? data.status : null,
+    },
+  });
+}
+
+export async function deleteMaterial(id: string, actor?: string | AdminActivityActor): Promise<void> {
+  const existing = await getMaterialById(id);
+  await deleteDoc(doc(db, 'materials', id));
+  await logAdminActivity({
+    action: 'delete',
+    entity: 'material',
+    entityId: id,
+    entityLabel: existing?.name || id,
+    message: `Deleted material "${existing?.name || id}"`,
+    actor,
+  });
+}
+
+export async function getSupplierById(id: string): Promise<Supplier | null> {
+  const snap = await getDoc(doc(db, 'suppliers', id));
+  if (!snap.exists()) return null;
+  return normalizeSupplier(snap.id, snap.data());
+}
+
+export async function createSupplier(
+  data: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>,
+  actor?: string | AdminActivityActor,
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'suppliers'), {
+    ...data,
+    supplierName: data.supplierName.trim(),
+    contactPerson: data.contactPerson.trim(),
+    mobile: data.mobile.trim(),
+    email: data.email.trim(),
+    address: data.address.trim(),
+    gstNumber: data.gstNumber.trim(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await logAdminActivity({
+    action: 'create',
+    entity: 'supplier',
+    entityId: ref.id,
+    entityLabel: data.supplierName,
+    message: `Created supplier "${data.supplierName}"`,
+    actor,
+    metadata: {
+      active: data.status,
+      mobile: data.mobile.trim() || null,
+      email: data.email.trim() || null,
+    },
+  });
+
+  return ref.id;
+}
+
+export async function updateSupplier(
+  id: string,
+  data: Partial<Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>>,
+  actor?: string | AdminActivityActor,
+): Promise<void> {
+  const existing = await getSupplierById(id);
+  if (!existing) {
+    throw new Error('Supplier not found.');
+  }
+
+  await updateDoc(doc(db, 'suppliers', id), {
+    ...data,
+    ...(typeof data.supplierName === 'string' ? { supplierName: data.supplierName.trim() } : {}),
+    ...(typeof data.contactPerson === 'string' ? { contactPerson: data.contactPerson.trim() } : {}),
+    ...(typeof data.mobile === 'string' ? { mobile: data.mobile.trim() } : {}),
+    ...(typeof data.email === 'string' ? { email: data.email.trim() } : {}),
+    ...(typeof data.address === 'string' ? { address: data.address.trim() } : {}),
+    ...(typeof data.gstNumber === 'string' ? { gstNumber: data.gstNumber.trim() } : {}),
+    updatedAt: serverTimestamp(),
+  });
+
+  await logAdminActivity({
+    action: 'update',
+    entity: 'supplier',
+    entityId: id,
+    entityLabel: data.supplierName || existing.supplierName,
+    message: `Updated supplier "${data.supplierName || existing.supplierName}"`,
+    actor,
+    metadata: {
+      updatedFields: Object.keys(data).join(', ') || 'none',
+    },
+  });
+}
+
+export async function deleteSupplier(id: string, actor?: string | AdminActivityActor): Promise<void> {
+  const existing = await getSupplierById(id);
+  await deleteDoc(doc(db, 'suppliers', id));
+  await logAdminActivity({
+    action: 'delete',
+    entity: 'supplier',
+    entityId: id,
+    entityLabel: existing?.supplierName || id,
+    message: `Deleted supplier "${existing?.supplierName || id}"`,
+    actor,
+  });
+}
+
+export async function generateNextPurchaseNumber(): Promise<string> {
+  const latestSequence = await getLatestPurchaseSequence();
+  return formatPurchaseNumber(latestSequence + 1);
+}
+
+export async function getAllPurchases(): Promise<Purchase[]> {
+  const q = query(collection(db, 'purchases'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((docSnap) => normalizePurchase(docSnap.id, docSnap.data()));
+}
+
+export async function getPurchaseById(id: string): Promise<Purchase | null> {
+  const snap = await getDoc(doc(db, 'purchases', id));
+  if (!snap.exists()) return null;
+  return normalizePurchase(snap.id, snap.data());
+}
+
+export async function getPurchaseItemsByPurchaseId(purchaseId: string): Promise<PurchaseItem[]> {
+  const q = query(collection(db, 'purchaseItems'), where('purchaseId', '==', purchaseId));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((docSnap) => normalizePurchaseItem(docSnap.id, docSnap.data()))
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+}
+
+export async function getStockTransactionsByReferenceId(referenceId: string): Promise<StockTransaction[]> {
+  const q = query(collection(db, 'stockTransactions'), where('referenceId', '==', referenceId));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((docSnap) => normalizeStockTransaction(docSnap.id, docSnap.data()))
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+}
+
+export async function createPurchase(
+  data: Omit<Purchase, 'id' | 'createdAt' | 'updatedAt' | 'totalQty'> & {
+    items: Array<Pick<PurchaseItem, 'productId' | 'quantity'>>;
+  },
+  actor?: string | AdminActivityActor,
+): Promise<string> {
+  const items = sanitizePurchaseItems(data.items);
+
+  if (!data.supplierId) {
+    throw new Error('Supplier is required.');
+  }
+
+  if (items.length === 0) {
+    throw new Error('At least one purchase item is required.');
+  }
+
+  const aggregatedItems = aggregatePurchaseItems(items);
+  const purchaseRef = doc(collection(db, 'purchases'));
+  const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+  const purchaseNumber = data.purchaseNumber.trim();
+  const purchaseLockRef = doc(db, 'purchaseLocks', purchaseNumber);
+  const inventoryCollectionRef = collection(db, 'inventoryTransactions');
+  const stockTransactionCollectionRef = collection(db, 'stockTransactions');
+
+  await runTransaction(db, async (transaction) => {
+    const purchaseLockSnap = await transaction.get(purchaseLockRef);
+    if (purchaseLockSnap.exists()) {
+      throw new Error(`Purchase ${purchaseNumber} has already been saved.`);
+    }
+
+    for (const aggregatedItem of aggregatedItems) {
+      const productRef = doc(db, 'products', aggregatedItem.productId);
+      const productSnap = await transaction.get(productRef);
+
+      if (!productSnap.exists()) {
+        throw new Error('One of the selected products no longer exists.');
+      }
+
+      const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+      const previousStock = product.stockQuantity;
+      const newStock = previousStock + aggregatedItem.quantity;
+      const nextStockFields = resolveProductStockFields({
+        stockQuantity: newStock,
+        lowStockLimit: product.lowStockLimit,
+      });
+
+      transaction.update(productRef, {
+        ...nextStockFields,
+        lastStockUpdatedAt: serverTimestamp(),
+        lastStockUpdatedBy: data.createdBy,
+        updatedAt: serverTimestamp(),
+      });
+
+      transaction.set(doc(inventoryCollectionRef), {
+        productId: product.id,
+        productName: product.name,
+        type: 'IN',
+        source: 'PURCHASE',
+        quantity: aggregatedItem.quantity,
+        previousStock,
+        newStock,
+        note: `Purchase ${purchaseNumber}`,
+        createdAt: serverTimestamp(),
+        createdBy: data.createdBy,
+      });
+
+      transaction.set(doc(stockTransactionCollectionRef), {
+        productId: product.id,
+        referenceType: 'purchase',
+        referenceId: purchaseRef.id,
+        quantity: aggregatedItem.quantity,
+        transactionType: 'IN',
+        createdAt: serverTimestamp(),
+      });
+    }
+
+    transaction.set(purchaseRef, {
+      purchaseNumber,
+      supplierId: data.supplierId,
+      purchaseDate: data.purchaseDate,
+      totalQty,
+      remarks: data.remarks.trim(),
+      createdBy: data.createdBy,
+      itemCount: items.length,
+      items,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    items.forEach((item) => {
+      const itemRef = doc(collection(db, 'purchaseItems'));
+      transaction.set(itemRef, {
+        purchaseId: purchaseRef.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    transaction.set(purchaseLockRef, {
+      purchaseId: purchaseRef.id,
+      createdAt: serverTimestamp(),
+    });
+  });
+
+  await logAdminActivity({
+    action: 'create',
+    entity: 'purchase',
+    entityId: purchaseRef.id,
+    entityLabel: data.purchaseNumber,
+    message: `Created purchase "${data.purchaseNumber}"`,
+    actor,
+    metadata: {
+      supplierId: data.supplierId,
+      totalQty,
+      items: items.length,
+    },
+  });
+
+  return purchaseRef.id;
+}
+
+export async function updatePurchase(
+  id: string,
+  data: Omit<Purchase, 'id' | 'createdAt' | 'updatedAt' | 'totalQty'> & {
+    items: Array<Pick<PurchaseItem, 'productId' | 'quantity'>>;
+  },
+  actor?: string | AdminActivityActor,
+): Promise<void> {
+  const purchaseRef = doc(db, 'purchases', id);
+  const purchaseItemsRef = collection(db, 'purchaseItems');
+  const inventoryCollectionRef = collection(db, 'inventoryTransactions');
+  const stockTransactionCollectionRef = collection(db, 'stockTransactions');
+  const sanitizedNewItems = sanitizePurchaseItems(data.items);
+
+  if (!data.supplierId) {
+    throw new Error('Supplier is required.');
+  }
+
+  if (sanitizedNewItems.length === 0) {
+    throw new Error('At least one purchase item is required.');
+  }
+
+  const existingItems = await getPurchaseItemsByPurchaseId(id);
+  let didChange = false;
+
+  await runTransaction(db, async (transaction) => {
+    const purchaseSnap = await transaction.get(purchaseRef);
+    if (!purchaseSnap.exists()) {
+      throw new Error('Purchase not found.');
+    }
+
+    const purchaseData = purchaseSnap.data() as Record<string, unknown>;
+    const currentItems = existingItems.length > 0
+      ? existingItems.map((item) => ({ productId: item.productId, quantity: item.quantity }))
+      : getPurchaseEmbeddedItems(purchaseData);
+    const normalizedCurrentItems = sanitizePurchaseItems(currentItems);
+    const unchanged =
+      ((purchaseData.purchaseNumber as string) || '') === data.purchaseNumber.trim() &&
+      ((purchaseData.supplierId as string) || '') === data.supplierId &&
+      (((purchaseData.remarks as string) || '') === data.remarks.trim()) &&
+      toDateOrNow(purchaseData.purchaseDate).getTime() === data.purchaseDate.getTime() &&
+      normalizedCurrentItems.length === sanitizedNewItems.length &&
+      normalizedCurrentItems.every((item, index) =>
+        item.productId === sanitizedNewItems[index]?.productId &&
+        item.quantity === sanitizedNewItems[index]?.quantity,
+      );
+
+    if (unchanged) {
+      return;
+    }
+
+    didChange = true;
+    const aggregatedCurrentItems = aggregatePurchaseItems(currentItems);
+    const aggregatedNewItems = aggregatePurchaseItems(sanitizedNewItems);
+    const affectedProductIds = Array.from(new Set([
+      ...aggregatedCurrentItems.map((item) => item.productId),
+      ...aggregatedNewItems.map((item) => item.productId),
+    ]));
+
+    const stockState = new Map<string, { product: Product; currentStock: number }>();
+
+    for (const productId of affectedProductIds) {
+      const productRef = doc(db, 'products', productId);
+      const productSnap = await transaction.get(productRef);
+
+      if (!productSnap.exists()) {
+        throw new Error('One of the selected products no longer exists.');
+      }
+
+      const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+      stockState.set(productId, { product, currentStock: product.stockQuantity });
+    }
+
+    const applyAdjustment = (
+      productId: string,
+      quantity: number,
+      transactionType: StockTransaction['transactionType'],
+      source: InventoryTransactionSource,
+      note: string,
+    ) => {
+      const state = stockState.get(productId);
+      if (!state) {
+        throw new Error('Failed to load product stock state.');
+      }
+
+      const previousStock = state.currentStock;
+      const newStock = transactionType === 'IN'
+        ? previousStock + quantity
+        : previousStock - quantity;
+
+      if (newStock < 0) {
+        throw new Error(`${state.product.name} does not have enough stock to reverse this purchase.`);
+      }
+
+      state.currentStock = newStock;
+
+      transaction.set(doc(inventoryCollectionRef), {
+        productId: state.product.id,
+        productName: state.product.name,
+        type: transactionType,
+        source,
+        quantity,
+        previousStock,
+        newStock,
+        note,
+        createdAt: serverTimestamp(),
+        createdBy: data.createdBy,
+      });
+
+      transaction.set(doc(stockTransactionCollectionRef), {
+        productId: state.product.id,
+        referenceType: 'purchase',
+        referenceId: id,
+        quantity,
+        transactionType,
+        createdAt: serverTimestamp(),
+      });
+    };
+
+    aggregatedCurrentItems.forEach((item) => {
+      applyAdjustment(
+        item.productId,
+        item.quantity,
+        'OUT',
+        'PURCHASE_EDIT',
+        `Purchase ${purchaseData.purchaseNumber || id} reversal`,
+      );
+    });
+
+    aggregatedNewItems.forEach((item) => {
+      applyAdjustment(
+        item.productId,
+        item.quantity,
+        'IN',
+        'PURCHASE_EDIT',
+        `Purchase ${data.purchaseNumber.trim()} reapplied`,
+      );
+    });
+
+    for (const [productId, state] of stockState.entries()) {
+      const productRef = doc(db, 'products', productId);
+      const nextStockFields = resolveProductStockFields({
+        stockQuantity: state.currentStock,
+        lowStockLimit: state.product.lowStockLimit,
+      });
+
+      transaction.update(productRef, {
+        ...nextStockFields,
+        lastStockUpdatedAt: serverTimestamp(),
+        lastStockUpdatedBy: data.createdBy,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    existingItems.forEach((item) => {
+      transaction.delete(doc(db, 'purchaseItems', item.id));
+    });
+
+    sanitizedNewItems.forEach((item) => {
+      const itemRef = doc(purchaseItemsRef);
+      transaction.set(itemRef, {
+        purchaseId: id,
+        productId: item.productId,
+        quantity: item.quantity,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    transaction.update(purchaseRef, {
+      purchaseNumber: data.purchaseNumber.trim(),
+      supplierId: data.supplierId,
+      purchaseDate: data.purchaseDate,
+      totalQty: sanitizedNewItems.reduce((sum, item) => sum + item.quantity, 0),
+      remarks: data.remarks.trim(),
+      createdBy: data.createdBy,
+      itemCount: sanitizedNewItems.length,
+      items: sanitizedNewItems,
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  if (!didChange) {
+    return;
+  }
+
+  await logAdminActivity({
+    action: 'update',
+    entity: 'purchase',
+    entityId: id,
+    entityLabel: data.purchaseNumber,
+    message: `Updated purchase "${data.purchaseNumber}"`,
+    actor,
+    metadata: {
+      supplierId: data.supplierId,
+      totalQty: sanitizedNewItems.reduce((sum, item) => sum + item.quantity, 0),
+      items: sanitizedNewItems.length,
+    },
+  });
+}
+
+export async function deletePurchase(id: string, actor?: string | AdminActivityActor): Promise<void> {
+  const purchaseRef = doc(db, 'purchases', id);
+  const inventoryCollectionRef = collection(db, 'inventoryTransactions');
+  const stockTransactionCollectionRef = collection(db, 'stockTransactions');
+  const existingItems = await getPurchaseItemsByPurchaseId(id);
+  let purchaseNumber = id;
+
+  await runTransaction(db, async (transaction) => {
+    const purchaseSnap = await transaction.get(purchaseRef);
+    if (!purchaseSnap.exists()) {
+      throw new Error('Purchase not found.');
+    }
+
+    const purchaseData = purchaseSnap.data() as Record<string, unknown>;
+    purchaseNumber = (purchaseData.purchaseNumber as string) || id;
+    const currentItems = existingItems.length > 0
+      ? existingItems.map((item) => ({ productId: item.productId, quantity: item.quantity }))
+      : getPurchaseEmbeddedItems(purchaseData);
+    const aggregatedCurrentItems = aggregatePurchaseItems(currentItems);
+
+    for (const aggregatedItem of aggregatedCurrentItems) {
+      const productRef = doc(db, 'products', aggregatedItem.productId);
+      const productSnap = await transaction.get(productRef);
+
+      if (!productSnap.exists()) {
+        throw new Error('One of the selected products no longer exists.');
+      }
+
+      const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+      const previousStock = product.stockQuantity;
+      const newStock = previousStock - aggregatedItem.quantity;
+
+      if (newStock < 0) {
+        throw new Error(`${product.name} does not have enough stock to remove this purchase.`);
+      }
+
+      const nextStockFields = resolveProductStockFields({
+        stockQuantity: newStock,
+        lowStockLimit: product.lowStockLimit,
+      });
+
+      transaction.update(productRef, {
+        ...nextStockFields,
+        lastStockUpdatedAt: serverTimestamp(),
+        lastStockUpdatedBy: typeof actor === 'string' ? actor : actor?.email || actor?.uid || 'admin',
+        updatedAt: serverTimestamp(),
+      });
+
+      transaction.set(doc(inventoryCollectionRef), {
+        productId: product.id,
+        productName: product.name,
+        type: 'OUT',
+        source: 'PURCHASE_DELETE',
+        quantity: aggregatedItem.quantity,
+        previousStock,
+        newStock,
+        note: `Purchase ${purchaseNumber} deleted`,
+        createdAt: serverTimestamp(),
+        createdBy: typeof actor === 'string' ? actor : actor?.email || actor?.uid || 'admin',
+      });
+
+      transaction.set(doc(stockTransactionCollectionRef), {
+        productId: product.id,
+        referenceType: 'purchase',
+        referenceId: id,
+        quantity: aggregatedItem.quantity,
+        transactionType: 'OUT',
+        createdAt: serverTimestamp(),
+      });
+    }
+
+    existingItems.forEach((item) => {
+      transaction.delete(doc(db, 'purchaseItems', item.id));
+    });
+
+    transaction.delete(purchaseRef);
+  });
+
+  await logAdminActivity({
+    action: 'delete',
+    entity: 'purchase',
+    entityId: id,
+    entityLabel: purchaseNumber,
+    message: `Deleted purchase "${purchaseNumber}"`,
+    actor,
+  });
+}
 
 export async function createOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   const ref = await addDoc(collection(db, 'orders'), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });

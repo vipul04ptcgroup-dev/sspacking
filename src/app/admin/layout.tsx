@@ -7,7 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import { Spinner } from '@/components/ui';
 import {
   LayoutDashboard, Package, ShoppingBag, Tags, Users, MessageSquare,
-  ArrowLeft, Menu, FileText, Boxes, ReceiptText, History, ShieldUser, ClipboardList,
+  ArrowLeft, Menu, FileText, Boxes, ReceiptText, History, ShieldUser, ClipboardList, Building2, Factory, BarChart3, FlaskConical,
 } from 'lucide-react';
 
 const navSections = [
@@ -31,6 +31,16 @@ const navSections = [
       { icon: ShoppingBag, label: 'Orders', href: '/admin/orders' },
       { icon: ReceiptText, label: 'Sales', href: '/admin/sales' },
       { icon: FileText, label: 'Delivery Challan', href: '/admin/delivery-challan' },
+    ],
+  },
+  {
+    title: 'Procurement',
+    items: [
+      { icon: Building2, label: 'Suppliers', href: '/admin/suppliers' },
+      { icon: ClipboardList, label: 'Purchases', href: '/admin/purchases' },
+      { icon: FlaskConical, label: 'Materials', href: '/admin/materials' },
+      { icon: Factory, label: 'Production Entry', href: '/admin/production' },
+      { icon: BarChart3, label: 'Production Reports', href: '/admin/production-reports' },
     ],
   },
   {
