@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { backfillProductStockFields, getAllProducts, deleteProduct, updateProduct, getAllCategories } from '@/lib/firestore';
+import { formatQuantityWithUnit, getProductUnitLabel } from '@/lib/product-units';
 import { useAuth } from '@/context/auth-context';
 import type { Product, Category } from '@/types';
 import { formatPrice } from '@/lib/utils';
@@ -142,8 +143,9 @@ export default function AdminProductsPage() {
   const filtered = products.filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.category.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+      p.categoryId.toLowerCase().includes(search.toLowerCase()) ||
+      p.sku.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || p.categoryId === categoryFilter;
     const matchesStatus =
       statusFilter === 'all' ||
       (statusFilter === 'active' && p.active) ||
@@ -159,7 +161,7 @@ export default function AdminProductsPage() {
   const categoryOptions = Array.from(
     new Set([
       ...categories.map((category) => category.slug),
-      ...products.map((product) => product.category),
+      ...products.map((product) => product.categoryId),
     ].filter(Boolean))
   );
 
@@ -255,18 +257,20 @@ export default function AdminProductsPage() {
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Product</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Category</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Unit</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Stock</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Price From</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Variants</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Pricing Tiers</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Status</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
                 {filtered.map(product => {
-                  const variants = Array.isArray(product.variants) ? product.variants : [];
-                  const pricedVariants = variants.filter(v => typeof v.price === 'number');
-                  const minPrice = pricedVariants.length ? Math.min(...pricedVariants.map(v => v.price as number)) : 0;
-                  const thumbnail = product.images?.[0] || variants.find(v => Array.isArray(v.images) && v.images[0])?.images?.[0];
+                  const minPrice = product.pricingTiers.length
+                    ? Math.min(...product.pricingTiers.map((tier) => tier.unitPrice))
+                    : 0;
+                  const thumbnail = product.images?.[0];
                   return (
                     <tr key={product.id} className="hover:bg-stone-50 transition">
                       <td className="px-4 py-3">
@@ -299,9 +303,11 @@ export default function AdminProductsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{product.category}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{product.categoryId}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{getProductUnitLabel(product.unit)}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{formatQuantityWithUnit(product.stockQuantity, product.unit)}</td>
                       <td className="px-4 py-3 text-sm font-bold text-stone-900">{formatPrice(minPrice)}</td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{variants.length}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{product.pricingTiers.length}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${product.active ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-stone-500'}`}>
                           {product.active ? 'Active' : 'Hidden'}

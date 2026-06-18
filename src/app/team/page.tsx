@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { backfillProductStockFields, getAllProducts } from '@/lib/firestore';
+import { formatQuantityWithUnit, getProductUnitLabel } from '@/lib/product-units';
 import { useAuth } from '@/context/auth-context';
 import type { Product } from '@/types';
 import { Badge, EmptyState, Spinner } from '@/components/ui';
@@ -49,7 +50,7 @@ export default function TeamStockPage() {
 
     return products.filter((product) =>
       product.name.toLowerCase().includes(term) ||
-      product.category.toLowerCase().includes(term) ||
+      product.categoryId.toLowerCase().includes(term) ||
       product.slug.toLowerCase().includes(term),
     );
   }, [products, search]);
@@ -153,6 +154,7 @@ export default function TeamStockPage() {
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Category</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Stock</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Low Stock Limit</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Unit</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Status</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Last Updated</th>
                   </tr>
@@ -166,9 +168,10 @@ export default function TeamStockPage() {
                           <p className="text-xs text-stone-500">{product.slug}</p>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-stone-600">{product.category}</td>
-                      <td className="px-5 py-4 text-sm font-semibold text-stone-900">{product.stockQuantity}</td>
-                      <td className="px-5 py-4 text-sm text-stone-600">{product.lowStockLimit}</td>
+                      <td className="px-5 py-4 text-sm text-stone-600">{product.categoryId}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-stone-900">{formatQuantityWithUnit(product.stockQuantity, product.unit)}</td>
+                      <td className="px-5 py-4 text-sm text-stone-600">{formatQuantityWithUnit(product.lowStockLimit, product.unit)}</td>
+                      <td className="px-5 py-4 text-sm text-stone-600">{getProductUnitLabel(product.unit)}</td>
                       <td className="px-5 py-4">
                         <Badge
                           variant={

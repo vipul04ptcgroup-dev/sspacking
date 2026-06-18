@@ -1,18 +1,10 @@
-export interface ProductVariant {
-  id?: string;
-  images?: string[];
-  capacity?: string;
-  neckSize?: string;
-  material?: string;
-  height?: string;
-  weight?: string;
-  packagingSize?: string;
-  color?: string;
-  sku?: string;
-  price?: number;
-  remark?: string;
+export interface PricingTier {
+  minQty: number;
+  maxQty: number;
+  unitPrice: number;
 }
 
+export type ProductUnit = 'kg' | 'gram';
 export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock';
 export type InventoryTransactionType = 'IN' | 'OUT';
 export type InventoryTransactionSource =
@@ -21,6 +13,7 @@ export type InventoryTransactionSource =
   | 'PURCHASE_EDIT'
   | 'PURCHASE_DELETE'
   | 'PRODUCTION'
+  | 'PRODUCTION_CONSUMPTION'
   | 'WEBSITE_ORDER'
   | 'MANUAL_SALE'
   | 'ORDER_CANCELLATION'
@@ -30,16 +23,27 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
+  categoryId: string;
   shortDescription: string;
-  category: string;
-  images?: string[];
-  variants: ProductVariant[];
+  description: string;
+  images: string[];
   tags: string[];
-  featured: boolean;
-  active: boolean;
-  hasVariants: boolean;
+  sku: string;
+  unit: ProductUnit;
   stockQuantity: number;
   lowStockLimit: number;
+  featured: boolean;
+  active: boolean;
+  capacity: string;
+  neckSize: string;
+  height: string;
+  weight: string;
+  material: string;
+  packagingSize: string;
+  color: string;
+  remark: string;
+  bottle_weight_gram?: number | null;
+  pricingTiers: PricingTier[];
   stockStatus: StockStatus;
   lastStockUpdatedAt?: Date | null;
   lastStockUpdatedBy?: string;
@@ -61,13 +65,12 @@ export interface CartItem {
   productId: string;
   productName: string;
   productImage: string;
-  variantId: string;
-  variantLabel: string;
   sku: string;
   price: number;
   quantity: number;
   slug: string;
-  category: string;
+  categoryId: string;
+  productLabel?: string;
 }
 
 export interface Address {
@@ -85,22 +88,26 @@ export interface OrderItem {
   productId: string;
   productName: string;
   productImage: string;
-  variantId: string;
-  variantLabel: string;
   sku: string;
   price: number;
   quantity: number;
+  productLabel?: string;
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'dispatched' | 'shipped' | 'delivered' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type DeliveryChallanStatus = 'draft' | 'ready' | 'dispatched' | 'delivered' | 'cancelled';
 export type OrderSource = 'website_order' | 'manual_sale';
+export type CustomerType = 'website' | 'manual';
+export type CustomerTypeFilter = 'all' | CustomerType;
+export type CustomerSortField = 'createdAt' | 'displayName' | 'email' | 'customerType';
+export type SortDirection = 'asc' | 'desc';
 
 export interface Order {
   id: string;
   userId: string;
   userEmail: string;
+  customerId?: string;
   source?: OrderSource;
   manualOrderId?: string;
   items: OrderItem[];
@@ -165,12 +172,32 @@ export interface DeliveryChallan {
 
 export interface User {
   id: string;
+  uid?: string;
   email: string;
   displayName: string;
   phone?: string;
   role: 'customer' | 'admin';
+  customerType: CustomerType;
+  customer_type?: CustomerType;
   addresses: Address[];
   createdAt: Date;
+}
+
+export interface CustomerListOptions {
+  customerType?: CustomerTypeFilter;
+  search?: string;
+  sortBy?: CustomerSortField;
+  sortDirection?: SortDirection;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CustomerListResult {
+  users: User[];
+  totalCount: number;
+  totalPages: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface TeamMember {
@@ -220,6 +247,8 @@ export interface InventoryTransaction {
   source: InventoryTransactionSource;
   orderId?: string;
   manualOrderId?: string;
+  productionBatchId?: string;
+  unit: ProductUnit;
   quantity: number;
   previousStock: number;
   newStock: number;
@@ -236,15 +265,6 @@ export interface Supplier {
   email: string;
   address: string;
   gstNumber: string;
-  status: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Material {
-  id: string;
-  name: string;
-  stock: number;
   status: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -277,6 +297,7 @@ export interface StockTransaction {
   productId: string;
   referenceType: 'purchase';
   referenceId: string;
+  unit: ProductUnit;
   quantity: number;
   transactionType: InventoryTransactionType;
   createdAt: Date;
@@ -296,7 +317,6 @@ export type AdminActivityEntity =
   | 'category'
   | 'order'
   | 'inventory'
-  | 'material'
   | 'supplier'
   | 'purchase'
   | 'delivery_challan'

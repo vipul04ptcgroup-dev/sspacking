@@ -75,7 +75,8 @@ function ProductsContent() {
       p.name.toLowerCase().includes(lq) ||
       p.shortDescription.toLowerCase().includes(lq) ||
       p.tags.some(t => t.toLowerCase().includes(lq)) ||
-      p.category.toLowerCase().includes(lq)
+      p.categoryId.toLowerCase().includes(lq) ||
+      p.sku.toLowerCase().includes(lq)
     );
   }
 
@@ -86,16 +87,24 @@ function ProductsContent() {
 
   if (selectedCategory) {
     if (selectedCategory === OTHER_CATEGORY_KEY) {
-      filtered = filtered.filter(p => !knownCategoryKeys.has(normalizeCategory(p.category || '')));
+      filtered = filtered.filter(p => !knownCategoryKeys.has(normalizeCategory(p.categoryId || '')));
     } else {
-      filtered = filtered.filter(p => normalizeCategory(p.category || '') === normalizeCategory(selectedCategory));
+      filtered = filtered.filter(p => normalizeCategory(p.categoryId || '') === normalizeCategory(selectedCategory));
     }
   }
 
   if (sortBy === 'price-asc') {
-    filtered = [...filtered].sort((a, b) => Math.min(...a.variants.map(v => v.price ?? Number.MAX_SAFE_INTEGER)) - Math.min(...b.variants.map(v => v.price ?? Number.MAX_SAFE_INTEGER)));
+    filtered = [...filtered].sort((a, b) => {
+      const left = Math.min(...a.pricingTiers.map((tier) => tier.unitPrice));
+      const right = Math.min(...b.pricingTiers.map((tier) => tier.unitPrice));
+      return left - right;
+    });
   } else if (sortBy === 'price-desc') {
-    filtered = [...filtered].sort((a, b) => Math.min(...b.variants.map(v => v.price ?? -1)) - Math.min(...a.variants.map(v => v.price ?? -1)));
+    filtered = [...filtered].sort((a, b) => {
+      const left = Math.min(...a.pricingTiers.map((tier) => tier.unitPrice));
+      const right = Math.min(...b.pricingTiers.map((tier) => tier.unitPrice));
+      return right - left;
+    });
   } else if (sortBy === 'name') {
     filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }

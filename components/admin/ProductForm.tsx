@@ -2,10 +2,12 @@
 
 import { useState, useEffect, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getAllCategories } from '@/lib/firestore';
+import { isProductionProductCategorySlug } from '@/lib/product-categories';
+import { getProductUnitForCategory, getProductUnitLabel } from '@/lib/product-units';
 import { uploadProductImage } from '@/lib/storage';
 import { slugify } from '@/lib/utils';
 import type { Category, Product } from '@/types';
@@ -16,38 +18,80 @@ import { Plus, Trash2, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
 
-const variantSchema = z.object({
-  id: z.string().optional(),
-  images: z.string().optional(),
-  capacity: z.string().optional(),
-  neckSize: z.string().optional(),
-  material: z.string().optional(),
-  height: z.string().optional(),
-  weight: z.string().optional(),
-  packagingSize: z.string().optional(),
-  color: z.string().optional(),
-  sku: z.string().optional(),
-  price: z.coerce.number().optional(),
-  remark: z.string().optional(),
+const pricingTierSchema = z.object({
+  minQty: z.coerce.number().int().min(1, 'Minimum quantity must be at least 1'),
+  maxQty: z.coerce.number().int().min(1, 'Maximum quantity must be at least 1'),
+  unitPrice: z.coerce.number().min(0, 'Unit price cannot be negative'),
 });
 
 const schema = z.object({
   name: z.string().min(2, 'Name required'),
   slug: z.string().min(2, 'Slug required'),
+  categoryId: z.string().min(1, 'Category required'),
   shortDescription: z.string().min(5, 'Short description required'),
-  category: z.string().min(1, 'Category required'),
+  description: z.string().trim().min(1, 'Product description required'),
   images: z.string().optional(),
   tags: z.string().optional(),
+  sku: z.string().min(1, 'SKU required'),
+  unit: z.enum(['kg', 'gram']),
+  stockQuantity: z.coerce.number().min(0, 'Stock quantity cannot be negative'),
+  lowStockLimit: z.coerce.number().min(0, 'Low stock limit cannot be negative'),
   featured: z.boolean(),
   active: z.boolean(),
-  hasVariants: z.boolean(),
-  stockQuantity: z.coerce.number().min(0, 'Stock quantity cannot be negative'),
-  lowStockLimit: z.coerce.number().min(1000, 'Low stock limit must be at least 1000'),
-  variants: z.array(variantSchema).optional(),
+  capacity: z.string().optional(),
+  neckSize: z.string().optional(),
+  height: z.string().optional(),
+  weight: z.string().optional(),
+  material: z.string().optional(),
+  packagingSize: z.string().optional(),
+  color: z.string().optional(),
+  remark: z.string().optional(),
+  bottle_weight_gram: z.preprocess(
+    (value) => (value === '' || value == null ? null : value),
+    z.coerce.number().int().gt(0, 'Bottle weight must be greater than 0').nullable(),
+  ),
+  pricingTiers: z.array(pricingTierSchema)
+    .min(1, 'At least one pricing tier is required')
+    .superRefine((tiers, ctx) => {
+      const sorted = tiers
+        .map((tier, index) => ({ ...tier, index }))
+        .sort((left, right) => left.minQty - right.minQty);
+
+      sorted.forEach((tier) => {
+        if (tier.maxQty < tier.minQty) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Maximum quantity must be greater than or equal to minimum quantity.',
+            path: [tier.index, 'maxQty'],
+          });
+        }
+      });
+
+      for (let index = 1; index < sorted.length; index += 1) {
+        const previousTier = sorted[index - 1];
+        const currentTier = sorted[index];
+
+        if (currentTier.minQty <= previousTier.maxQty) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Pricing tier ranges cannot overlap.',
+            path: [currentTier.index, 'minQty'],
+          });
+        }
+      }
+    }),
+}).superRefine((data, ctx) => {
+  if (isProductionProductCategorySlug(data.categoryId) && !data.bottle_weight_gram) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Bottle weight is required for Production products.',
+      path: ['bottle_weight_gram'],
+    });
+  }
 });
 
-type FormInput = z.input<typeof schema>;
-type FormOutput = z.output<typeof schema>;
+type FormValues = z.input<typeof schema>;
+type FormSubmitValues = z.output<typeof schema>;
 type ProductFormValues = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stockStatus'>;
 
 interface ProductFormProps {
@@ -55,297 +99,354 @@ interface ProductFormProps {
   onSubmit: (data: ProductFormValues) => Promise<void>;
 }
 
-const newVariant = () => ({
-  id: Math.random().toString(36).slice(2),
-  images: '',
-  capacity: '',
-  neckSize: '',
-  material: '',
-  height: '',
-  weight: '',
-  packagingSize: '',
-  color: '',
-  sku: '',
-  price: undefined as number | undefined,
-  remark: '',
+const newPricingTier = () => ({
+  minQty: 1,
+  maxQty: 1,
+  unitPrice: 0,
 });
 
 export default function ProductForm({ initialData, onSubmit }: ProductFormProps) {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
-  const [uploadingCommon, setUploadingCommon] = useState(false);
-  const [uploadingVariant, setUploadingVariant] = useState<number | null>(null);
-  const [hasVariants, setHasVariants] = useState((initialData?.variants?.length || 0) > 0);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   useEffect(() => {
     getAllCategories().then(setCategories);
   }, []);
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormInput, unknown, FormOutput>({
+  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues, unknown, FormSubmitValues>({
     resolver: zodResolver(schema),
     defaultValues: initialData
       ? {
           ...initialData,
           images: (initialData.images || []).join(', '),
-          variants: (initialData.variants || []).map(v => ({
-            ...v,
-            images: (v.images || []).join(', '),
-          })),
           tags: initialData.tags.join(', '),
-          featured: initialData.featured,
-          active: initialData.active,
-          hasVariants: initialData.hasVariants ?? (initialData.variants?.length || 0) > 0,
-          stockQuantity: initialData.stockQuantity ?? 1,
-          lowStockLimit: initialData.lowStockLimit ?? 1000,
+          description: initialData.description || '',
+          unit: initialData.unit || getProductUnitForCategory(initialData.categoryId),
+          pricingTiers: initialData.pricingTiers.length > 0
+            ? initialData.pricingTiers.map((tier) => ({
+                minQty: tier.minQty,
+                maxQty: tier.maxQty,
+                unitPrice: tier.unitPrice,
+              }))
+            : [newPricingTier()],
         }
-      : { active: true, featured: false, hasVariants: false, stockQuantity: 1, lowStockLimit: 1000, variants: [] },
+      : {
+          name: '',
+          slug: '',
+          categoryId: '',
+          shortDescription: '',
+          description: '',
+          images: '',
+          tags: '',
+          sku: '',
+          unit: 'gram',
+          stockQuantity: 1,
+          lowStockLimit: 1000,
+          featured: false,
+          active: true,
+          capacity: '',
+          neckSize: '',
+          height: '',
+          weight: '',
+          material: '',
+          packagingSize: '',
+          color: '',
+          remark: '',
+          bottle_weight_gram: null,
+          pricingTiers: [newPricingTier()],
+        },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'pricingTiers',
+  });
 
   const nameValue = watch('name');
   const slugValue = watch('slug');
-  const commonImagesValue = watch('images');
-  const variantsValue = watch('variants');
+  const imagesValue = watch('images');
+  const pricingTiersValue = watch('pricingTiers');
+  const selectedCategoryId = watch('categoryId');
+  const isProductionCategory = isProductionProductCategorySlug(selectedCategoryId || initialData?.categoryId || 'finished');
+  const derivedUnit = getProductUnitForCategory(selectedCategoryId || initialData?.categoryId || 'finished');
+  const derivedUnitLabel = getProductUnitLabel(derivedUnit);
 
   const toImageList = (value?: string) =>
-    value ? value.split(',').map((img: string) => img.trim()).filter(Boolean) : [];
+    value ? value.split(',').map((img) => img.trim()).filter(Boolean) : [];
 
-  const setCommonImages = (images: string[]) => {
+  const setImages = (images: string[]) => {
     setValue('images', images.join(', '), { shouldDirty: true });
   };
 
-  const setVariantImages = (index: number, images: string[]) => {
-    setValue(`variants.${index}.images`, images.join(', '), { shouldDirty: true });
-  };
-
   const productStorageId = () => slugValue?.trim() || initialData?.id || 'new_product';
+
   useEffect(() => {
     if (!initialData && nameValue) setValue('slug', slugify(nameValue));
   }, [nameValue, initialData, setValue]);
 
-  const handleCommonImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  useEffect(() => {
+    setValue('unit', derivedUnit, { shouldDirty: Boolean(selectedCategoryId) });
+  }, [derivedUnit, selectedCategoryId, setValue]);
+
+  useEffect(() => {
+    if (!isProductionCategory) {
+      setValue('bottle_weight_gram', null, { shouldDirty: Boolean(selectedCategoryId) });
+    }
+  }, [isProductionCategory, selectedCategoryId, setValue]);
+
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
     if (!files.length) return;
-    setUploadingCommon(true);
+
+    setUploadingImages(true);
     try {
-      const urls = await Promise.all(files.map(file => uploadProductImage(file, productStorageId())));
-      setCommonImages([...toImageList(commonImagesValue), ...urls]);
+      const urls = await Promise.all(files.map((file) => uploadProductImage(file, productStorageId())));
+      setImages([...toImageList(imagesValue), ...urls]);
       toast.success('Product image uploaded');
     } catch {
       toast.error('Failed to upload product image');
     } finally {
-      setUploadingCommon(false);
-      e.target.value = '';
+      setUploadingImages(false);
+      event.target.value = '';
     }
   };
 
-  const handleVariantImageUpload = async (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    setUploadingVariant(index);
-    try {
-      const urls = await Promise.all(files.map(file => uploadProductImage(file, `${productStorageId()}_variant_${index + 1}`)));
-      const current = toImageList(variantsValue?.[index]?.images);
-      setVariantImages(index, [...current, ...urls]);
-      toast.success(`Variant ${index + 1} image uploaded`);
-    } catch {
-      toast.error('Failed to upload variant image');
-    } finally {
-      setUploadingVariant(null);
-      e.target.value = '';
-    }
-  };
+  const handleFormSubmit = handleSubmit(async (data: FormSubmitValues) => {
+    const normalizedPricingTiers = data.pricingTiers
+      .map((tier): Product['pricingTiers'][number] => ({
+        minQty: Number(tier.minQty),
+        maxQty: Number(tier.maxQty),
+        unitPrice: Number(tier.unitPrice),
+      }))
+      .sort((left, right) => left.minQty - right.minQty);
 
-  const handleFormSubmit: SubmitHandler<FormOutput> = async (data) => {
+    const hasInvalidTier = normalizedPricingTiers.some((tier) =>
+      !Number.isFinite(tier.minQty) ||
+      !Number.isFinite(tier.maxQty) ||
+      !Number.isFinite(tier.unitPrice) ||
+      tier.minQty < 1 ||
+      tier.maxQty < 1 ||
+      tier.unitPrice < 0 ||
+      tier.maxQty < tier.minQty
+    );
+
+    const hasOverlappingTiers = normalizedPricingTiers.some((tier, index) => {
+      if (index === 0) return false;
+      return tier.minQty <= normalizedPricingTiers[index - 1].maxQty;
+    });
+
+    if (hasInvalidTier || hasOverlappingTiers) {
+      toast.error('Please review the pricing tiers.');
+      return;
+    }
+
     setSaving(true);
     try {
-      const tags = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
-      const images = data.images ? data.images.split(',').map((img: string) => img.trim()).filter(Boolean) : [];
       await onSubmit({
-        ...data,
-        images,
-        tags,
-        hasVariants,
-        variants: hasVariants
-          ? (data.variants || []).map(v => ({
-              ...v,
-              images: v.images ? v.images.split(',').map((img: string) => img.trim()).filter(Boolean) : [],
-            }))
-          : [],
+        name: data.name.trim(),
+        slug: data.slug.trim(),
+        categoryId: data.categoryId,
+        shortDescription: data.shortDescription.trim(),
+        description: data.description?.trim() || '',
+        images: toImageList(data.images),
+        tags: data.tags ? data.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [],
+        sku: data.sku.trim(),
+        unit: derivedUnit,
+        stockQuantity: Number(data.stockQuantity),
+        lowStockLimit: Number(data.lowStockLimit),
+        featured: data.featured,
+        active: data.active,
+        capacity: data.capacity?.trim() || '',
+        neckSize: data.neckSize?.trim() || '',
+        height: data.height?.trim() || '',
+        weight: data.weight?.trim() || '',
+        material: data.material?.trim() || '',
+        packagingSize: data.packagingSize?.trim() || '',
+        color: data.color?.trim() || '',
+        remark: data.remark?.trim() || '',
+        bottle_weight_gram: isProductionCategory ? Number(data.bottle_weight_gram) : null,
+        pricingTiers: normalizedPricingTiers,
+        lastStockUpdatedAt: initialData?.lastStockUpdatedAt ?? null,
+        lastStockUpdatedBy: initialData?.lastStockUpdatedBy || '',
       });
     } catch {
       toast.error('Failed to save product');
     } finally {
       setSaving(false);
     }
-  };
+  });
 
-  const catOptions = [{ value: '', label: 'Select Category' }, ...categories.map(c => ({ value: c.slug, label: c.name }))];
+  const categoryOptions = [{ value: '', label: 'Select Category' }, ...categories.map((category) => ({
+    value: category.slug,
+    label: category.name,
+  }))];
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-stone-900 mb-5">Basic Information</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
+    <form onSubmit={handleFormSubmit} className="space-y-8">
+      <div className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm">
+        <h2 className="mb-5 text-lg font-bold text-stone-900">Basic Information</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
           <input type="hidden" {...register('images')} />
+          <input type="hidden" {...register('unit')} />
           <Input label="Product Name *" id="name" placeholder="e.g. Bamboo Dropper Bottle" error={errors.name?.message} {...register('name')} className="sm:col-span-2" />
           <Input label="Slug *" id="slug" placeholder="auto-generated" error={errors.slug?.message} {...register('slug')} />
-          <Select label="Category *" id="category" options={catOptions} error={errors.category?.message} {...register('category')} />
+          <Select label="Category *" id="categoryId" options={categoryOptions} error={errors.categoryId?.message} {...register('categoryId')} />
           <Textarea label="Short Description *" id="shortDescription" placeholder="1-2 sentence overview" error={errors.shortDescription?.message} {...register('shortDescription')} className="sm:col-span-2" />
-          <div className="sm:col-span-2 space-y-3">
-            <p className="text-sm font-medium text-stone-700">Common Product Images</p>
-            {toImageList(commonImagesValue).length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {toImageList(commonImagesValue).map((img, i) => (
-                  <div key={`${img}-${i}`} className="relative aspect-square rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group">
+          <div className="sm:col-span-2">
+            <Textarea
+              label="Product Description *"
+              id="description"
+              rows={10}
+              placeholder={'Add the full product description.\n\nYou can use paragraphs, line breaks, and bullet points like:\n- Food-grade material\n- Leak-resistant cap\n- Suitable for bulk packaging'}
+              error={errors.description?.message}
+              {...register('description')}
+            />
+            <p className="mt-1 text-xs text-stone-500">
+              Supports paragraphs, line breaks, and bullet points.
+            </p>
+          </div>
+
+          <div className="space-y-3 sm:col-span-2">
+            <p className="text-sm font-medium text-stone-700">Product Images</p>
+            {toImageList(imagesValue).length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {toImageList(imagesValue).map((img, index) => (
+                  <div key={`${img}-${index}`} className="group relative aspect-square overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
                     <Image src={img} alt="" fill className="object-cover" />
                     <button
                       type="button"
-                      onClick={() => setCommonImages(toImageList(commonImagesValue).filter((_, idx) => idx !== i))}
-                      className="absolute top-2 right-2 w-7 h-7 bg-black/65 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                      onClick={() => setImages(toImageList(imagesValue).filter((_, imageIndex) => imageIndex !== index))}
+                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white opacity-0 transition group-hover:opacity-100"
                       aria-label="Remove image"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
               </div>
             ) : null}
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-400 hover:text-amber-600">
-              <Upload className="w-4 h-4" />
-              <span>{uploadingCommon ? 'Uploading...' : 'Upload Images'}</span>
-              <input type="file" accept="image/*" multiple onChange={handleCommonImageUpload} className="hidden" disabled={uploadingCommon} />
+              <Upload className="h-4 w-4" />
+              <span>{uploadingImages ? 'Uploading...' : 'Upload Images'}</span>
+              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={uploadingImages} />
             </label>
           </div>
+
           <Input label="Tags (comma-separated)" id="tags" placeholder="bamboo, eco, bottle" {...register('tags')} className="sm:col-span-2" />
-          <Input
-            label="Initial Stock Quantity *"
-            id="stockQuantity"
-            type="number"
-            min={0}
-            error={errors.stockQuantity?.message}
-            {...register('stockQuantity')}
-          />
-          <Input
-            label="Low Stock Limit *"
-            id="lowStockLimit"
-            type="number"
-            min={1000}
-            error={errors.lowStockLimit?.message}
-            {...register('lowStockLimit')}
-          />
-          <p className="sm:col-span-2 text-xs text-stone-500">
-            Stock status is calculated automatically from stock quantity and low stock limit.
+          <Input label="SKU *" id="sku" placeholder="SKU-001" error={errors.sku?.message} {...register('sku')} />
+          <Input label="Inventory Unit" value={derivedUnitLabel} readOnly className="bg-stone-50" />
+          <Input label={`Stock Quantity (${derivedUnitLabel}) *`} id="stockQuantity" type="number" min={0} error={errors.stockQuantity?.message} {...register('stockQuantity')} />
+          <Input label={`Low Stock Limit (${derivedUnitLabel}) *`} id="lowStockLimit" type="number" min={0} error={errors.lowStockLimit?.message} {...register('lowStockLimit')} />
+          <p className="text-xs text-stone-500 sm:col-span-2">
+            Stock is stored automatically in {derivedUnitLabel} based on the selected category. Manual unit changes are disabled.
           </p>
           <div className="flex items-center gap-6 sm:col-span-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" {...register('featured')} className="w-4 h-4 accent-amber-600" />
+            <label className="flex cursor-pointer items-center gap-2">
+              <input type="checkbox" {...register('featured')} className="h-4 w-4 accent-amber-600" />
               <span className="text-sm font-medium text-stone-700">Featured Product</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" {...register('active')} className="w-4 h-4 accent-amber-600" />
+            <label className="flex cursor-pointer items-center gap-2">
+              <input type="checkbox" {...register('active')} className="h-4 w-4 accent-amber-600" />
               <span className="text-sm font-medium text-stone-700">Active (Visible)</span>
             </label>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
-        <label className="flex items-center gap-2 mb-4">
-          <input
-            type="checkbox"
-            checked={hasVariants}
-            onChange={(e) => {
-              setHasVariants(e.target.checked);
-              setValue('hasVariants', e.target.checked);
-            }}
-          />
-          <span className="text-sm font-medium">This product has variants</span>
-        </label>
+      <div className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm">
+        <div className="mb-5">
+          <h2 className="text-lg font-bold text-stone-900">Product Specifications</h2>
+          <p className="mt-0.5 text-xs text-stone-500">Store the product details directly on the product record.</p>
+        </div>
 
-        {hasVariants && (
-          <>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-lg font-bold text-stone-900">Variants</h2>
-                <p className="text-xs text-stone-500 mt-0.5">Define technical specifications for each variant</p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Input label="Capacity" {...register('capacity')} error={errors.capacity?.message} />
+          <Input label="Neck Size" {...register('neckSize')} error={errors.neckSize?.message} />
+          <Input label="Height" {...register('height')} error={errors.height?.message} />
+          <Input label={`Weight (${derivedUnitLabel})`} {...register('weight')} error={errors.weight?.message} />
+          <Input label="Material" {...register('material')} error={errors.material?.message} />
+          <Input label="Packaging Size" {...register('packagingSize')} error={errors.packagingSize?.message} />
+          <Input label="Color" {...register('color')} error={errors.color?.message} />
+          {isProductionCategory ? (
+            <Input
+              label="Bottle Weight (GRAM) *"
+              type="number"
+              min={1}
+              step={1}
+              helpText="Required only for Production products."
+              error={errors.bottle_weight_gram?.message}
+              {...register('bottle_weight_gram')}
+            />
+          ) : null}
+          <Input label="Remark" {...register('remark')} error={errors.remark?.message} className="lg:col-span-2" />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-stone-900">Pricing Tiers</h2>
+            <p className="mt-0.5 text-xs text-stone-500">Define unit price bands by order quantity.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => append(newPricingTier())}>
+            <Plus className="h-3.5 w-3.5" /> Add Tier
+          </Button>
+        </div>
+        <div className="mb-3 grid gap-3 px-1 text-xs font-semibold uppercase tracking-wide text-stone-500 sm:grid-cols-3">
+          <span>Min Qty</span>
+          <span>Max Qty</span>
+          <span>Unit Price</span>
+        </div>
+
+        <div className="space-y-4">
+          {fields.map((field, index) => (
+            <div key={field.id} className="rounded-xl border border-stone-200 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-stone-700">Tier {index + 1}</span>
+                {fields.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => remove(index)}
+                    className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => append(newVariant())}>
-                <Plus className="w-3.5 h-3.5" /> Add Variant
-              </Button>
-            </div>
 
-            <div className="space-y-4">
-              {fields.map((field, index) => (
-                <div key={field.id} className="border border-stone-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-stone-700">Variant {index + 1}</span>
-                    {fields.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <input type="hidden" {...register(`variants.${index}.images`)} />
-                    <div className="col-span-2 sm:col-span-3 space-y-3">
-                      <p className="text-sm font-medium text-stone-700">Variant Images</p>
-                      {toImageList(variantsValue?.[index]?.images).length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {toImageList(variantsValue?.[index]?.images).map((img, i) => (
-                            <div key={`${img}-${i}`} className="relative aspect-square rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group">
-                              <Image src={img} alt="" fill className="object-cover" />
-                              <button
-                                type="button"
-                                onClick={() => setVariantImages(index, toImageList(variantsValue?.[index]?.images).filter((_, idx) => idx !== i))}
-                                className="absolute top-2 right-2 w-7 h-7 bg-black/65 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-                                aria-label="Remove variant image"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-400 hover:text-amber-600">
-                        <Upload className="w-4 h-4" />
-                        <span>{uploadingVariant === index ? 'Uploading...' : `Upload Variant ${index + 1} Images`}</span>
-                        <input type="file" accept="image/*" multiple onChange={(e) => handleVariantImageUpload(index, e)} className="hidden" disabled={uploadingVariant === index} />
-                      </label>
-                    </div>
-                    <Input label="Capacity" {...register(`variants.${index}.capacity`)} error={errors.variants?.[index]?.capacity?.message} />
-                    <Input label="Neck Size" {...register(`variants.${index}.neckSize`)} error={errors.variants?.[index]?.neckSize?.message} />
-                    <Input label="Material" {...register(`variants.${index}.material`)} error={errors.variants?.[index]?.material?.message} />
-                    <Input label="Height" {...register(`variants.${index}.height`)} error={errors.variants?.[index]?.height?.message} />
-                    <Input label="Weight" {...register(`variants.${index}.weight`)} error={errors.variants?.[index]?.weight?.message} />
-                    <Input label="Packaging Size" {...register(`variants.${index}.packagingSize`)} error={errors.variants?.[index]?.packagingSize?.message} />
-                    <Input label="Color" {...register(`variants.${index}.color`)} error={errors.variants?.[index]?.color?.message} />
-                    <Input label="SKU" {...register(`variants.${index}.sku`)} error={errors.variants?.[index]?.sku?.message} />
-                    <Input label="Price (Optional)" type="number" {...register(`variants.${index}.price`)} />
-                    <Input label="Remark" {...register(`variants.${index}.remark`)} />
-                  </div>
-                </div>
-              ))}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Input
+                  label="Min Qty *"
+                  type="number"
+                  min={1}
+                  error={errors.pricingTiers?.[index]?.minQty?.message}
+                  {...register(`pricingTiers.${index}.minQty`)}
+                />
+                <Input
+                  label="Max Qty *"
+                  type="number"
+                  min={Number(pricingTiersValue?.[index]?.minQty) || 1}
+                  error={errors.pricingTiers?.[index]?.maxQty?.message}
+                  {...register(`pricingTiers.${index}.maxQty`)}
+                />
+                <Input
+                  label="Unit Price *"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  error={errors.pricingTiers?.[index]?.unitPrice?.message}
+                  {...register(`pricingTiers.${index}.unitPrice`)}
+                />
+              </div>
             </div>
-
-            <div className="mt-5 flex justify-end">
-              <Button type="button" variant="outline" size="sm" onClick={() => append(newVariant())}>
-                <Plus className="w-3.5 h-3.5" /> Add Variant
-              </Button>
-            </div>
-          </>
-        )}
+          ))}
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <Button type="submit" loading={saving} size="lg" disabled={uploadingCommon || uploadingVariant !== null}>
+        <Button type="submit" loading={saving} size="lg" disabled={uploadingImages}>
           {saving ? 'Saving...' : initialData ? 'Update Product' : 'Create Product'}
         </Button>
         <Button type="button" variant="ghost" onClick={() => router.push('/admin/products', { scroll: true })}>Cancel</Button>

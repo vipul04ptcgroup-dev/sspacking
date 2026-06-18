@@ -10,6 +10,7 @@ import {
   getAllProducts,
   getManualSales,
 } from '@/lib/firestore';
+import { formatQuantityWithUnit, getProductUnitLabel } from '@/lib/product-units';
 import type { Order, OrderStatus, Product } from '@/types';
 import { formatDate, formatPrice, ORDER_STATUS_COLORS } from '@/lib/utils';
 import Button from '@/components/ui/Button';
@@ -38,11 +39,11 @@ const STATUS_OPTIONS: OrderStatus[] = [
 const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Card', 'Cheque', 'Credit'];
 
 function getProductImage(product: Product): string {
-  return (
-    product.images?.[0] ||
-    product.variants.find((variant) => Array.isArray(variant.images) && variant.images[0])?.images?.[0] ||
-    ''
-  );
+  return product.images?.[0] || '';
+}
+
+function getProductLabel(product: Product): string {
+  return [product.capacity, product.color].filter(Boolean).join(' / ');
 }
 
 export default function AdminSalesPage() {
@@ -97,14 +98,11 @@ export default function AdminSalesPage() {
     if (!term) return products;
 
     return products.filter((product) => {
-      const variantText = product.variants
-        .map((variant) => [variant.capacity, variant.color, variant.sku].filter(Boolean).join(' '))
-        .join(' ');
-
       return (
         product.name.toLowerCase().includes(term) ||
-        product.category.toLowerCase().includes(term) ||
-        variantText.toLowerCase().includes(term)
+        product.categoryId.toLowerCase().includes(term) ||
+        product.sku.toLowerCase().includes(term) ||
+        getProductLabel(product).toLowerCase().includes(term)
       );
     });
   }, [products, productSearch]);
@@ -116,9 +114,8 @@ export default function AdminSalesPage() {
 
   useEffect(() => {
     if (!selectedProduct) return;
-    const pricedVariants = selectedProduct.variants.filter((variant) => typeof variant.price === 'number' && variant.price > 0);
-    const defaultPrice = pricedVariants.length > 0
-      ? Math.min(...pricedVariants.map((variant) => variant.price as number))
+    const defaultPrice = selectedProduct.pricingTiers.length > 0
+      ? Math.min(...selectedProduct.pricingTiers.map((tier) => tier.unitPrice))
       : 0;
     setProductPrice(String(defaultPrice));
   }, [selectedProductId, selectedProduct]);
@@ -183,13 +180,12 @@ export default function AdminSalesPage() {
       return;
     }
     if (selectedProduct.stockQuantity < parsedQuantity) {
-      toast.error(`${selectedProduct.name} has only ${selectedProduct.stockQuantity} in stock.`);
+      toast.error(`${selectedProduct.name} has only ${formatQuantityWithUnit(selectedProduct.stockQuantity, selectedProduct.unit)} in stock.`);
       return;
     }
 
     setSaving(true);
     try {
-      const chosenVariant = selectedProduct.variants.find((variant) => typeof variant.price === 'number') || selectedProduct.variants[0];
       const saleId = await createManualSaleWithInventory({
         userId: user?.uid || 'manual-sale',
         userEmail: email.trim(),
@@ -197,9 +193,8 @@ export default function AdminSalesPage() {
           productId: selectedProduct.id,
           productName: selectedProduct.name,
           productImage: getProductImage(selectedProduct),
-          variantId: chosenVariant?.id || '',
-          variantLabel: [chosenVariant?.capacity, chosenVariant?.color].filter(Boolean).join(' / ') || 'Default',
-          sku: chosenVariant?.sku || '',
+          productLabel: getProductLabel(selectedProduct) || undefined,
+          sku: selectedProduct.sku || '',
           price: parsedPrice,
           quantity: parsedQuantity,
         }],
@@ -311,11 +306,11 @@ export default function AdminSalesPage() {
                 >
                   <option value="">Choose a product</option>
                   {filteredProducts.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} ({product.stockQuantity} in stock)
-                    </option>
-                  ))}
-                </select>
+                  <option key={product.id} value={product.id}>
+                      {product.name} ({formatQuantityWithUnit(product.stockQuantity, product.unit)} in stock)
+                  </option>
+                ))}
+              </select>
               </div>
 
               {selectedProduct ? (
@@ -328,14 +323,14 @@ export default function AdminSalesPage() {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-stone-900">{selectedProduct.name}</p>
-                      <p className="text-xs text-stone-500">Current stock: {selectedProduct.stockQuantity}</p>
+                      <p className="text-xs text-stone-500">Current stock: {formatQuantityWithUnit(selectedProduct.stockQuantity, selectedProduct.unit)}</p>
                     </div>
                   </div>
                 </div>
               ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Input label="Quantity" type="number" min={1} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+                <Input label={`Quantity${selectedProduct ? ` (${getProductUnitLabel(selectedProduct.unit)})` : ''}`} type="number" min={1} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
                 <Input label="Product Price" type="number" min={0} value={productPrice} onChange={(event) => setProductPrice(event.target.value)} />
                 <Input label="Discount" type="number" min={0} value={discount} onChange={(event) => setDiscount(event.target.value)} />
                 <Input label="GST" type="number" min={0} value={gst} onChange={(event) => setGst(event.target.value)} />

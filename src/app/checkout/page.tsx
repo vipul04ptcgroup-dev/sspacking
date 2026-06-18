@@ -104,8 +104,9 @@ export default function CheckoutPage() {
         userEmail: data.email,
         items: items.map(i => ({
           productId: i.productId, productName: i.productName,
-          productImage: i.productImage, variantId: i.variantId,
-          variantLabel: i.variantLabel, sku: i.sku, price: i.price, quantity: i.quantity,
+          productImage: i.productImage,
+          productLabel: i.productLabel,
+          sku: i.sku, price: i.price, quantity: i.quantity,
         })),
         shippingAddress: {
           fullName: data.fullName, phone: data.phone,
@@ -189,13 +190,13 @@ export default function CheckoutPage() {
               <h2 className="text-lg font-bold text-stone-900 mb-4">Order Summary</h2>
               <div className="space-y-3 mb-5">
                 {items.map(item => (
-                  <div key={`${item.productId}-${item.variantId}`} className="flex gap-3">
+                  <div key={item.productId} className="flex gap-3">
                     <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-stone-50 shrink-0">
                       {item.productImage && <Image src={item.productImage} alt={item.productName} fill className="object-cover" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-stone-900 line-clamp-2">{item.productName}</p>
-                      <p className="text-xs text-stone-500">{item.variantLabel}</p>
+                      {item.productLabel ? <p className="text-xs text-stone-500">{item.productLabel}</p> : null}
                       <p className="text-xs font-bold text-stone-900">{formatPrice(item.price)} × {item.quantity}</p>
                     </div>
                   </div>

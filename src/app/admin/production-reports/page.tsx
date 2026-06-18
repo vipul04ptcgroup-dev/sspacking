@@ -17,6 +17,7 @@ import {
   Search,
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
+import { isCoreProductCategorySlug } from '@/lib/product-categories';
 import Button from '@/components/ui/Button';
 import { EmptyState, Select, Spinner } from '@/components/ui';
 import toast from 'react-hot-toast';
@@ -26,9 +27,9 @@ type ProductOption = {
   name: string;
 };
 
-type ProductionMaterial = {
-  materialId: string;
-  materialName: string;
+type ProductionRawMaterial = {
+  productId: string;
+  productName: string;
   qty: number;
 };
 
@@ -36,16 +37,24 @@ type ProductionEntry = {
   id: string;
   productId: string;
   productName: string;
+  finishedInventoryTransactionId?: string;
+  rawMaterialInventoryTransactionIds: string[];
   productionQty: number;
+  quantityProducedBottles: number;
+  bottleWeightGram: number;
+  productionWeightGrams: number;
+  productionWeightKg: number;
   productionDate: string;
   notes: string;
-  materials: ProductionMaterial[];
+  rawMaterials: ProductionRawMaterial[];
   createdAt: Date | null;
 };
 
 const PAGE_SIZE = 10;
 
 function mapProductOption(id: string, data: Record<string, unknown>): ProductOption | null {
+  const rawCategoryId = String(data.categoryId || data.category || '').trim().toLowerCase();
+  if (rawCategoryId && (!isCoreProductCategorySlug(rawCategoryId) || rawCategoryId !== 'production')) return null;
   const rawName = data.name || data.productName || data.title;
   if (typeof rawName !== 'string' || !rawName.trim()) return null;
   return { id, name: rawName.trim() };
@@ -74,6 +83,14 @@ function formatDateTime(value: Date | null): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(value);
+}
+
+function formatGrams(value: number): string {
+  return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatKilograms(value: number): string {
+  return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 3 }).format(value);
 }
 
 function escapeCsv(value: string | number): string {
@@ -114,17 +131,38 @@ export default function AdminProductionReportsPage() {
             id: docSnap.id,
             productId: (data.productId as string) || '',
             productName: (data.productName as string) || '',
+            finishedInventoryTransactionId: (data.finishedInventoryTransactionId as string) || undefined,
+            rawMaterialInventoryTransactionIds: Array.isArray(data.rawMaterialInventoryTransactionIds)
+              ? data.rawMaterialInventoryTransactionIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+              : [],
             productionQty: typeof data.productionQty === 'number' ? data.productionQty : 0,
+            quantityProducedBottles:
+              typeof data.quantityProducedBottles === 'number'
+                ? data.quantityProducedBottles
+                : typeof data.productionQty === 'number'
+                  ? data.productionQty
+                  : 0,
+            bottleWeightGram: typeof data.bottleWeightGram === 'number' ? data.bottleWeightGram : 0,
+            productionWeightGrams: typeof data.productionWeightGrams === 'number' ? data.productionWeightGrams : 0,
+            productionWeightKg: typeof data.productionWeightKg === 'number' ? data.productionWeightKg : 0,
             productionDate: (data.productionDate as string) || '',
             notes: (data.notes as string) || '',
-            materials: Array.isArray(data.materials)
-              ? data.materials.map((material) => ({
-                  materialId: (material as Record<string, unknown>).materialId as string,
-                  materialName: ((material as Record<string, unknown>).materialName as string) || 'Unnamed Material',
-                  qty: typeof (material as Record<string, unknown>).qty === 'number'
-                    ? ((material as Record<string, unknown>).qty as number)
+            rawMaterials: Array.isArray(data.rawMaterials)
+              ? data.rawMaterials.map((rawMaterial) => ({
+                  productId: ((rawMaterial as Record<string, unknown>).productId as string) || ((rawMaterial as Record<string, unknown>).materialId as string) || '',
+                  productName: ((rawMaterial as Record<string, unknown>).productName as string) || ((rawMaterial as Record<string, unknown>).materialName as string) || 'Unnamed Raw Material',
+                  qty: typeof (rawMaterial as Record<string, unknown>).qty === 'number'
+                    ? ((rawMaterial as Record<string, unknown>).qty as number)
                     : 0,
                 }))
+              : Array.isArray(data.materials)
+                ? data.materials.map((rawMaterial) => ({
+                    productId: ((rawMaterial as Record<string, unknown>).productId as string) || ((rawMaterial as Record<string, unknown>).materialId as string) || '',
+                    productName: ((rawMaterial as Record<string, unknown>).productName as string) || ((rawMaterial as Record<string, unknown>).materialName as string) || 'Unnamed Raw Material',
+                    qty: typeof (rawMaterial as Record<string, unknown>).qty === 'number'
+                      ? ((rawMaterial as Record<string, unknown>).qty as number)
+                      : 0,
+                  }))
               : [],
             createdAt: toDateOrNull(data.createdAt),
           } satisfies ProductionEntry;
@@ -155,12 +193,12 @@ export default function AdminProductionReportsPage() {
       const matchesProduct = !selectedProductId || entry.productId === selectedProductId;
       const matchesStart = !startDate || entry.productionDate >= startDate;
       const matchesEnd = !endDate || entry.productionDate <= endDate;
-      const materialsText = entry.materials.map((material) => material.materialName).join(' ').toLowerCase();
+      const rawMaterialsText = entry.rawMaterials.map((rawMaterial) => rawMaterial.productName).join(' ').toLowerCase();
       const matchesSearch =
         !term ||
         entry.productName.toLowerCase().includes(term) ||
         entry.notes.toLowerCase().includes(term) ||
-        materialsText.includes(term);
+        rawMaterialsText.includes(term);
 
       return matchesProduct && matchesStart && matchesEnd && matchesSearch;
     });
@@ -171,20 +209,24 @@ export default function AdminProductionReportsPage() {
   }, [selectedProductId, startDate, endDate, search]);
 
   const summary = useMemo(() => {
-    const totalProduction = filteredProductions.reduce((sum, entry) => sum + entry.productionQty, 0);
-    const materialConsumptionMap = filteredProductions.reduce<Map<string, number>>((map, entry) => {
-      entry.materials.forEach((material) => {
-        map.set(material.materialName, (map.get(material.materialName) || 0) + material.qty);
+    const totalBottles = filteredProductions.reduce((sum, entry) => sum + entry.quantityProducedBottles, 0);
+    const totalProductionWeightGrams = filteredProductions.reduce((sum, entry) => sum + entry.productionWeightGrams, 0);
+    const totalProductionWeightKg = filteredProductions.reduce((sum, entry) => sum + entry.productionWeightKg, 0);
+    const rawMaterialConsumptionMap = filteredProductions.reduce<Map<string, number>>((map, entry) => {
+      entry.rawMaterials.forEach((rawMaterial) => {
+        map.set(rawMaterial.productName, (map.get(rawMaterial.productName) || 0) + rawMaterial.qty);
       });
       return map;
     }, new Map());
 
-    const materialConsumption = Array.from(materialConsumptionMap.entries())
+    const materialConsumption = Array.from(rawMaterialConsumptionMap.entries())
       .map(([name, qty]) => ({ name, qty }))
       .sort((a, b) => b.qty - a.qty);
 
     return {
-      totalProduction,
+      totalBottles,
+      totalProductionWeightGrams,
+      totalProductionWeightKg,
       materialConsumption,
     };
   }, [filteredProductions]);
@@ -208,12 +250,13 @@ export default function AdminProductionReportsPage() {
     }
 
     const rows = [
-      ['Date', 'Product Name', 'Production Quantity', 'Materials Used', 'Created At'],
+      ['Batch ID', 'Date', 'Product Name', 'Production Quantity', 'Raw Materials Used', 'Created At'],
       ...filteredProductions.map((entry) => [
+        entry.id,
         entry.productionDate,
         entry.productName,
-        entry.productionQty,
-        entry.materials.map((material) => `${material.materialName}: ${material.qty}`).join(' | '),
+        `${entry.quantityProducedBottles} bottles | ${entry.productionWeightGrams} g | ${entry.productionWeightKg} kg`,
+        entry.rawMaterials.map((rawMaterial) => `${rawMaterial.productName}: ${rawMaterial.qty}`).join(' | '),
         formatDateTime(entry.createdAt),
       ]),
     ];
@@ -248,7 +291,7 @@ export default function AdminProductionReportsPage() {
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-black text-stone-900">Production Reports</h1>
-          <p className="mt-1 text-stone-500">Review production output, material usage, and export filtered reports.</p>
+          <p className="mt-1 text-stone-500">Review production output, raw material usage, and export filtered reports.</p>
         </div>
         <Button onClick={handleExportCsv}>
           <Download className="h-4 w-4" />
@@ -273,7 +316,7 @@ export default function AdminProductionReportsPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by product, note, or material"
+            placeholder="Search by product, note, or raw material"
               className="w-full rounded-lg border border-stone-300 bg-white py-2.5 pl-10 pr-4 text-sm text-stone-800 transition hover:border-stone-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
@@ -318,8 +361,10 @@ export default function AdminProductionReportsPage() {
               <p className="text-sm text-stone-500">{selectedProductLabel}</p>
             </div>
           </div>
-          <div className="text-4xl font-black text-stone-900">{summary.totalProduction}</div>
-          <p className="mt-2 text-sm text-stone-500">{filteredProductions.length} production entr{filteredProductions.length === 1 ? 'y' : 'ies'} in report</p>
+          <div className="text-4xl font-black text-stone-900">{summary.totalBottles}</div>
+          <p className="mt-2 text-sm text-stone-500">bottles across {filteredProductions.length} production entr{filteredProductions.length === 1 ? 'y' : 'ies'}</p>
+          <p className="mt-3 text-sm text-stone-600">{formatGrams(summary.totalProductionWeightGrams)} GRAM</p>
+          <p className="text-sm text-stone-600">{formatKilograms(summary.totalProductionWeightKg)} KG</p>
         </div>
 
         <div className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm">
@@ -328,19 +373,19 @@ export default function AdminProductionReportsPage() {
               <Boxes className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-stone-900">Material Consumption</h2>
-              <p className="text-sm text-stone-500">Grouped by material name</p>
+              <h2 className="text-lg font-bold text-stone-900">Raw Material Consumption</h2>
+              <p className="text-sm text-stone-500">Grouped by raw material product</p>
             </div>
           </div>
 
           {summary.materialConsumption.length === 0 ? (
-            <p className="text-sm text-stone-500">No material consumption for the current filter.</p>
+            <p className="text-sm text-stone-500">No raw material consumption for the current filter.</p>
           ) : (
             <div className="space-y-3">
               {summary.materialConsumption.map((material) => (
                 <div key={material.name} className="flex items-center justify-between rounded-xl bg-stone-50 px-4 py-3">
                   <span className="text-sm font-medium text-stone-700">{material.name}</span>
-                  <span className="text-sm font-bold text-stone-900">{material.qty}</span>
+                  <span className="text-sm font-bold text-stone-900">{formatKilograms(material.qty)} KG</span>
                 </div>
               ))}
             </div>
@@ -373,9 +418,12 @@ export default function AdminProductionReportsPage() {
                 <thead>
                   <tr className="border-b border-stone-100 bg-stone-50">
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Date</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Batch</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Product Name</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Production Quantity</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Materials Used</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Bottles</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Bottle Weight</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Production Weight</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Raw Materials Used</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Created At</th>
                   </tr>
                 </thead>
@@ -383,14 +431,22 @@ export default function AdminProductionReportsPage() {
                   {paginatedProductions.map((entry) => (
                     <tr key={entry.id} className="hover:bg-stone-50 transition">
                       <td className="px-5 py-4 text-sm text-stone-600">{formatDate(entry.productionDate)}</td>
+                      <td className="px-5 py-4 text-sm text-stone-600">{entry.id}</td>
                       <td className="px-5 py-4 text-sm font-semibold text-stone-900">{entry.productName}</td>
-                      <td className="px-5 py-4 text-sm font-bold text-stone-900">{entry.productionQty}</td>
+                      <td className="px-5 py-4 text-sm font-bold text-stone-900">{entry.quantityProducedBottles}</td>
+                      <td className="px-5 py-4 text-sm text-stone-600">{formatGrams(entry.bottleWeightGram)} GRAM</td>
                       <td className="px-5 py-4 text-sm text-stone-600">
                         <div className="space-y-1">
-                          {entry.materials.map((material) => (
-                            <div key={`${entry.id}-${material.materialId}`} className="flex items-center justify-between gap-4">
-                              <span>{material.materialName}</span>
-                              <span className="font-semibold text-stone-900">{material.qty}</span>
+                          <div>{formatGrams(entry.productionWeightGrams)} GRAM</div>
+                          <div className="font-semibold text-stone-900">{formatKilograms(entry.productionWeightKg)} KG</div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-stone-600">
+                        <div className="space-y-1">
+                          {entry.rawMaterials.map((rawMaterial) => (
+                            <div key={`${entry.id}-${rawMaterial.productId}-${rawMaterial.productName}`} className="flex items-center justify-between gap-4">
+                              <span>{rawMaterial.productName}</span>
+                              <span className="font-semibold text-stone-900">{formatKilograms(rawMaterial.qty)} KG</span>
                             </div>
                           ))}
                         </div>
@@ -410,20 +466,36 @@ export default function AdminProductionReportsPage() {
                   <div>
                     <p className="text-sm font-bold text-stone-900">{entry.productName}</p>
                     <p className="mt-1 text-xs text-stone-500">{formatDate(entry.productionDate)}</p>
+                    <p className="mt-1 text-xs text-stone-500">Batch: {entry.id}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs uppercase tracking-wide text-stone-500">Qty</p>
-                    <p className="text-lg font-black text-stone-900">{entry.productionQty}</p>
+                    <p className="text-xs uppercase tracking-wide text-stone-500">Bottles</p>
+                    <p className="text-lg font-black text-stone-900">{entry.quantityProducedBottles}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 rounded-xl bg-stone-50 px-4 py-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-stone-500">Bottle Weight</p>
+                    <p className="mt-1 text-sm font-semibold text-stone-900">{formatGrams(entry.bottleWeightGram)} GRAM</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-stone-500">Production Weight</p>
+                    <p className="mt-1 text-sm font-semibold text-stone-900">{formatGrams(entry.productionWeightGrams)} GRAM</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-stone-500">Production Weight</p>
+                    <p className="mt-1 text-sm font-semibold text-stone-900">{formatKilograms(entry.productionWeightKg)} KG</p>
                   </div>
                 </div>
 
                 <div className="mt-4 rounded-xl bg-stone-50 px-4 py-3">
-                  <p className="text-xs uppercase tracking-wide text-stone-500">Materials Used</p>
+                  <p className="text-xs uppercase tracking-wide text-stone-500">Raw Materials Used</p>
                   <div className="mt-2 space-y-2">
-                    {entry.materials.map((material) => (
-                      <div key={`${entry.id}-${material.materialId}`} className="flex items-center justify-between text-sm">
-                        <span className="text-stone-700">{material.materialName}</span>
-                        <span className="font-semibold text-stone-900">{material.qty}</span>
+                    {entry.rawMaterials.map((rawMaterial) => (
+                      <div key={`${entry.id}-${rawMaterial.productId}-${rawMaterial.productName}`} className="flex items-center justify-between text-sm">
+                        <span className="text-stone-700">{rawMaterial.productName}</span>
+                        <span className="font-semibold text-stone-900">{formatKilograms(rawMaterial.qty)} KG</span>
                       </div>
                     ))}
                   </div>

@@ -11,15 +11,16 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const pricedVariants = product.variants.filter(v => typeof v.price === 'number' && v.price > 0);
-  const hasPrice = pricedVariants.length > 0;
+  const pricingTiers = [...product.pricingTiers].sort((left, right) => left.minQty - right.minQty);
+  const lowestTier = pricingTiers.reduce<Product['pricingTiers'][number] | null>((lowest, tier) => {
+    if (!lowest || tier.unitPrice < lowest.unitPrice) return tier;
+    return lowest;
+  }, null);
+  const hasPrice = Boolean(lowestTier);
   const isOutOfStock = product.stockQuantity <= 0;
-  const lowestVariant = hasPrice
-    ? pricedVariants.reduce((min, v) => (v.price as number) < (min.price as number) ? v : min, pricedVariants[0])
-    : product.variants[0];
 
-  const previewImage = lowestVariant?.images?.[0] || product.images?.[0] || '';
-  const productUrl = `/products/${product.category}/${product.slug}`;
+  const previewImage = product.images?.[0] || '';
+  const productUrl = `/products/${product.categoryId}/${product.slug}`;
   const enquiryUrl = `/contact?product=${encodeURIComponent(product.name)}&productUrl=${encodeURIComponent(productUrl)}#quote`;
 
   return (
@@ -69,20 +70,22 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       <div className="p-4">
         <Link href={productUrl} className="block">
-          <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide mb-1">{product.category}</p>
+          <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide mb-1">{product.categoryId}</p>
           <h3 className="text-sm font-bold text-stone-900 group-hover:text-amber-700 transition leading-snug line-clamp-2 mb-2">{product.name}</h3>
           <p className="text-xs text-stone-500 line-clamp-2 mb-3">{product.shortDescription}</p>
         </Link>
 
         <div className="flex items-center justify-between">
           <div>
-            {hasPrice && lowestVariant?.price !== undefined && (
-              <span className="text-base font-black text-stone-900">{formatPrice(lowestVariant.price)}</span>
+            {hasPrice && lowestTier && (
+              <span className="text-base font-black text-stone-900">{formatPrice(lowestTier.unitPrice)}</span>
             )}
             <p className={`text-[10px] mt-0.5 ${isOutOfStock ? 'text-red-500' : 'text-stone-400'}`}>
               {isOutOfStock
                 ? 'Checkout unavailable'
-                : `${product.variants.length} variant${product.variants.length !== 1 ? 's' : ''}`}
+                : pricingTiers.length > 1
+                  ? `${pricingTiers.length} pricing tiers`
+                  : 'Single product pricing'}
             </p>
           </div>
           <Link href={enquiryUrl} className="inline-flex items-center rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-bold text-amber-600 hover:bg-amber-50 transition">

@@ -1,9 +1,18 @@
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, serverTimestamp, runTransaction, writeBatch,
+  query, where, orderBy, limit, serverTimestamp, runTransaction, writeBatch, deleteField,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import {
+  CORE_PRODUCT_CATEGORY_SLUGS,
+  PRODUCTION_CATEGORY_SLUG,
+  isCoreProductCategorySlug,
+  isProductionProductCategorySlug,
+  normalizeCategorySlug,
+} from './product-categories';
+import { getProductUnitForCategory } from './product-units';
 import type {
+  Address,
   Product,
   Category,
   Order,
@@ -18,7 +27,11 @@ import type {
   OrderStatus,
   DeliveryChallan,
   DeliveryChallanStatus,
-  Material,
+  CustomerListOptions,
+  CustomerListResult,
+  CustomerType,
+  CustomerTypeFilter,
+  CustomerSortField,
   Supplier,
   Purchase,
   PurchaseItem,
@@ -35,6 +48,29 @@ type AdminActivityActor = {
 };
 
 type AdminActivityMetadata = Record<string, string | number | boolean | null>;
+
+type ProductionConsumptionItemInput = {
+  productId: string;
+  productName: string;
+  quantityKg: number;
+};
+
+type SaveProductionEntryInput = {
+  productionDate: string;
+  productId: string;
+  quantityProducedBottles: number;
+  notes?: string;
+  rawMaterials: ProductionConsumptionItemInput[];
+};
+
+type CustomerSyncInput = {
+  uid?: string;
+  email?: string;
+  phone?: string;
+  displayName?: string;
+  address?: Address;
+  customerType: CustomerType;
+};
 
 type AdminActivityInput = {
   action: AdminActivityLog['action'];
@@ -66,17 +102,118 @@ function resolveAdminActor(actor?: string | AdminActivityActor) {
 
 function sanitizeStockValue(value: unknown, fallback = 0): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.floor(value));
+  return Math.max(0, value);
 }
 
 function sanitizeLowStockLimit(value: unknown, fallback = DEFAULT_LOW_STOCK_LIMIT): number {
   return Math.max(DEFAULT_LOW_STOCK_LIMIT, sanitizeStockValue(value, fallback));
 }
 
+function sanitizeOptionalText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function sanitizePricingValue(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.max(0, value);
+}
+
+function sanitizeBottleWeightGram(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.round(value);
+  }
+
+  if (typeof value === 'string') {
+    const normalizedValue = value.trim();
+    if (!normalizedValue) return null;
+
+    const numericMatch = normalizedValue.match(/(\d+(?:\.\d+)?)/);
+    if (!numericMatch) return null;
+
+    const parsedValue = Number(numericMatch[1]);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) return null;
+    return Math.round(parsedValue);
+  }
+
+  return null;
+}
+
+function normalizeEmail(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function normalizePhone(value: unknown): string {
+  return typeof value === 'string' ? value.replace(/\D/g, '') : '';
+}
+
+function normalizeCustomerType(value: unknown): CustomerType {
+  return value === 'manual' ? 'manual' : 'website';
+}
+
+function mergeAddresses(existing: unknown, incoming?: Address): Address[] {
+  const current = Array.isArray(existing) ? (existing as Address[]) : [];
+  if (!incoming) return current;
+
+  const normalizedIncomingKey = JSON.stringify({
+    fullName: incoming.fullName.trim(),
+    phone: normalizePhone(incoming.phone),
+    addressLine1: incoming.addressLine1.trim(),
+    addressLine2: incoming.addressLine2?.trim() || '',
+    city: incoming.city.trim(),
+    state: incoming.state.trim(),
+    pincode: incoming.pincode.trim(),
+    country: incoming.country.trim(),
+  });
+
+  const alreadyExists = current.some((address) => JSON.stringify({
+    fullName: address.fullName?.trim?.() || '',
+    phone: normalizePhone(address.phone),
+    addressLine1: address.addressLine1?.trim?.() || '',
+    addressLine2: address.addressLine2?.trim?.() || '',
+    city: address.city?.trim?.() || '',
+    state: address.state?.trim?.() || '',
+    pincode: address.pincode?.trim?.() || '',
+    country: address.country?.trim?.() || '',
+  }) === normalizedIncomingKey);
+
+  return alreadyExists ? current : [...current, incoming];
+}
+
 export function calculateStockStatus(stockQuantity: number, lowStockLimit: number): Product['stockStatus'] {
   if (stockQuantity <= 0) return 'out_of_stock';
   if (stockQuantity < lowStockLimit) return 'low_stock';
   return 'in_stock';
+}
+
+const PRODUCTION_BOTTLE_WEIGHT_BY_NAME: Record<string, number> = {
+  'rose water bottle': 250,
+  'shampoo bottle': 500,
+  'oil bottle': 1000,
+};
+
+function inferProductionBottleWeightGram(data: Record<string, unknown>): number | null {
+  const explicitBottleWeight = sanitizeBottleWeightGram(data.bottle_weight_gram);
+  if (explicitBottleWeight != null) return explicitBottleWeight;
+
+  const legacyWeight = sanitizeBottleWeightGram(data.weight);
+  if (legacyWeight != null) return legacyWeight;
+
+  const legacyCapacity = sanitizeBottleWeightGram(data.capacity);
+  if (legacyCapacity != null) return legacyCapacity;
+
+  const normalizedName = sanitizeOptionalText(data.name).toLowerCase();
+  return PRODUCTION_BOTTLE_WEIGHT_BY_NAME[normalizedName] ?? null;
+}
+
+function resolveProductBottleWeightGram(categoryId: string, value: unknown): number | null {
+  if (!isProductionProductCategorySlug(categoryId)) return null;
+  return sanitizeBottleWeightGram(value);
+}
+
+function assertValidProductBottleWeight(categoryId: string, bottleWeightGram: number | null) {
+  if (isProductionProductCategorySlug(categoryId) && bottleWeightGram == null) {
+    throw new Error('Bottle weight is required for production products.');
+  }
 }
 
 function resolveProductStockFields(data: Partial<Product>, fallback?: Partial<Product>) {
@@ -96,36 +233,147 @@ function resolveProductStockFields(data: Partial<Product>, fallback?: Partial<Pr
   };
 }
 
+function normalizePricingTiers(data: Record<string, unknown>, legacyPrice?: number | null): Product['pricingTiers'] {
+  const rawPricingTiers = Array.isArray(data.pricingTiers) ? data.pricingTiers : [];
+
+  const normalizedPricingTiers = rawPricingTiers
+    .map((tier): Product['pricingTiers'][number] | null => {
+      const record = tier as Record<string, unknown>;
+      const unitPrice = sanitizePricingValue(record.unitPrice);
+      if (unitPrice == null) return null;
+
+      const minQty = Math.max(1, Math.floor(sanitizeStockValue(record.minQty, 1)));
+      const rawMaxQty = record.maxQty;
+      if (typeof rawMaxQty !== 'number' || !Number.isFinite(rawMaxQty)) return null;
+      const maxQty = Math.max(minQty, Math.floor(rawMaxQty));
+
+      return {
+        minQty,
+        maxQty,
+        unitPrice,
+      };
+    })
+    .filter((tier): tier is Product['pricingTiers'][number] => tier !== null)
+    .sort((left, right) => left.minQty - right.minQty)
+    .filter((tier, index, tiers) => index === 0 || tier.minQty > tiers[index - 1].maxQty);
+
+  if (normalizedPricingTiers.length > 0) {
+    return normalizedPricingTiers;
+  }
+
+  if (legacyPrice != null) {
+    return [{ minQty: 1, maxQty: 1, unitPrice: legacyPrice }];
+  }
+
+  return [];
+}
+
+function assertValidPricingTiers(pricingTiers: Product['pricingTiers']) {
+  if (pricingTiers.length === 0) {
+    throw new Error('At least one pricing tier is required.');
+  }
+
+  const sortedPricingTiers = [...pricingTiers].sort((left, right) => left.minQty - right.minQty);
+
+  sortedPricingTiers.forEach((tier) => {
+    if (!Number.isFinite(tier.minQty) || tier.minQty < 1) {
+      throw new Error('Each pricing tier must have a valid minimum quantity.');
+    }
+    if (!Number.isFinite(tier.maxQty) || tier.maxQty < tier.minQty) {
+      throw new Error('Each pricing tier must have a valid maximum quantity.');
+    }
+    if (!Number.isFinite(tier.unitPrice) || tier.unitPrice < 0) {
+      throw new Error('Each pricing tier must have a valid unit price.');
+    }
+  });
+
+  for (let index = 1; index < sortedPricingTiers.length; index += 1) {
+    if (sortedPricingTiers[index].minQty <= sortedPricingTiers[index - 1].maxQty) {
+      throw new Error('Pricing tier ranges cannot overlap.');
+    }
+  }
+}
+
+function getProductLabel(product: Pick<Product, 'capacity' | 'color'>): string {
+  return [product.capacity, product.color].filter(Boolean).join(' / ');
+}
+
+function sanitizeProductWriteData(data: Partial<Product>) {
+  const sanitizedCategoryId = typeof data.categoryId === 'string' ? sanitizeOptionalText(data.categoryId) : '';
+  const resolvedUnit = sanitizedCategoryId ? getProductUnitForCategory(sanitizedCategoryId) : undefined;
+  const bottleWeightGram = sanitizeBottleWeightGram(data.bottle_weight_gram);
+
+  return {
+    ...(typeof data.name === 'string' ? { name: sanitizeOptionalText(data.name) } : {}),
+    ...(typeof data.slug === 'string' ? { slug: sanitizeOptionalText(data.slug) } : {}),
+    ...(sanitizedCategoryId ? { categoryId: sanitizedCategoryId, category: sanitizedCategoryId } : {}),
+    ...(resolvedUnit ? { unit: resolvedUnit } : {}),
+    ...(typeof data.shortDescription === 'string' ? { shortDescription: sanitizeOptionalText(data.shortDescription) } : {}),
+    ...(typeof data.description === 'string' ? { description: sanitizeOptionalText(data.description) } : {}),
+    ...(Array.isArray(data.images) ? { images: data.images.filter((image) => typeof image === 'string' && image.trim().length > 0).map((image) => image.trim()) } : {}),
+    ...(Array.isArray(data.tags) ? { tags: data.tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0).map((tag) => tag.trim()) } : {}),
+    ...(typeof data.sku === 'string' ? { sku: sanitizeOptionalText(data.sku) } : {}),
+    ...(typeof data.capacity === 'string' ? { capacity: sanitizeOptionalText(data.capacity) } : {}),
+    ...(typeof data.neckSize === 'string' ? { neckSize: sanitizeOptionalText(data.neckSize) } : {}),
+    ...(typeof data.height === 'string' ? { height: sanitizeOptionalText(data.height) } : {}),
+    ...(typeof data.weight === 'string' ? { weight: sanitizeOptionalText(data.weight) } : {}),
+    ...(typeof data.material === 'string' ? { material: sanitizeOptionalText(data.material) } : {}),
+    ...(typeof data.packagingSize === 'string' ? { packagingSize: sanitizeOptionalText(data.packagingSize) } : {}),
+    ...(typeof data.color === 'string' ? { color: sanitizeOptionalText(data.color) } : {}),
+    ...(typeof data.remark === 'string' ? { remark: sanitizeOptionalText(data.remark) } : {}),
+    ...('bottle_weight_gram' in data && bottleWeightGram != null ? { bottle_weight_gram: bottleWeightGram } : {}),
+    ...(Array.isArray(data.pricingTiers)
+      ? {
+          pricingTiers: data.pricingTiers
+            .map((tier) => ({
+              minQty: Math.max(1, Math.floor(sanitizeStockValue(tier.minQty, 1))),
+              maxQty: Math.max(1, Math.floor(sanitizeStockValue(tier.maxQty, 1))),
+              unitPrice: sanitizePricingValue(tier.unitPrice) ?? 0,
+            }))
+            .sort((left, right) => left.minQty - right.minQty),
+        }
+      : {}),
+    ...(typeof data.featured === 'boolean' ? { featured: data.featured } : {}),
+    ...(typeof data.active === 'boolean' ? { active: data.active } : {}),
+  };
+}
+
 function normalizeProduct(id: string, data: Record<string, unknown>): Product {
-  const variants = (Array.isArray(data.variants) ? data.variants : []).map((v: any) => ({
-    id: v?.id || Math.random().toString(36).slice(2),
-    images: Array.isArray(v?.images) ? v.images : [],
-    capacity: v?.capacity || v?.size || undefined,
-    neckSize: v?.neckSize || undefined,
-    material: v?.material || undefined,
-    height: v?.height || undefined,
-    weight: v?.weight || undefined,
-    packagingSize: v?.packagingSize || undefined,
-    color: v?.color || undefined,
-    sku: v?.sku || undefined,
-    price: typeof v?.price === 'number' ? v.price : undefined,
-    remark: v?.remark || undefined,
-  }));
+  const legacyVariants = Array.isArray(data.variants) ? data.variants : [];
+  const firstVariant = (legacyVariants[0] || {}) as Record<string, unknown>;
+  const legacyPrice = sanitizePricingValue(firstVariant.price ?? data.price);
+  const categoryId = sanitizeOptionalText(data.categoryId) || sanitizeOptionalText(data.category);
+  const unit = getProductUnitForCategory(categoryId);
+  const images = Array.isArray(data.images) ? (data.images as string[]).filter(Boolean) : [];
+  const migratedVariantImages = Array.isArray(firstVariant.images) ? (firstVariant.images as string[]).filter(Boolean) : [];
+  const pricingTiers = normalizePricingTiers(data, legacyPrice);
+  const bottleWeightGram = resolveProductBottleWeightGram(categoryId, inferProductionBottleWeightGram(data));
 
   return {
     id,
-    name: (data.name as string) || '',
-    slug: (data.slug as string) || '',
-    shortDescription: (data.shortDescription as string) || '',
-    category: (data.category as string) || (data.categoryId as string) || '',
-    images: Array.isArray(data.images) ? (data.images as string[]) : [],
-    variants,
-    tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
-    featured: Boolean(data.featured),
-    active: Boolean(data.active),
-    hasVariants: typeof data.hasVariants === 'boolean' ? data.hasVariants : variants.length > 0,
+    name: sanitizeOptionalText(data.name),
+    slug: sanitizeOptionalText(data.slug),
+    categoryId,
+    shortDescription: sanitizeOptionalText(data.shortDescription),
+    description: sanitizeOptionalText(data.description) || sanitizeOptionalText(data.shortDescription),
+    images: images.length > 0 ? images : migratedVariantImages,
+    tags: Array.isArray(data.tags) ? (data.tags as string[]).filter(Boolean) : [],
+    sku: sanitizeOptionalText(data.sku) || sanitizeOptionalText(firstVariant.sku),
+    unit,
     stockQuantity: sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
     lowStockLimit: sanitizeLowStockLimit(data.lowStockLimit, DEFAULT_LOW_STOCK_LIMIT),
+    featured: Boolean(data.featured),
+    active: Boolean(data.active),
+    capacity: sanitizeOptionalText(data.capacity) || sanitizeOptionalText(firstVariant.capacity ?? firstVariant.size),
+    neckSize: sanitizeOptionalText(data.neckSize) || sanitizeOptionalText(firstVariant.neckSize),
+    height: sanitizeOptionalText(data.height) || sanitizeOptionalText(firstVariant.height),
+    weight: sanitizeOptionalText(data.weight) || sanitizeOptionalText(firstVariant.weight),
+    material: sanitizeOptionalText(data.material) || sanitizeOptionalText(firstVariant.material),
+    packagingSize: sanitizeOptionalText(data.packagingSize) || sanitizeOptionalText(firstVariant.packagingSize),
+    color: sanitizeOptionalText(data.color) || sanitizeOptionalText(firstVariant.color),
+    remark: sanitizeOptionalText(data.remark) || sanitizeOptionalText(firstVariant.remark),
+    bottle_weight_gram: bottleWeightGram,
+    pricingTiers,
     stockStatus: calculateStockStatus(
       sanitizeStockValue(data.stockQuantity, DEFAULT_INITIAL_STOCK_QUANTITY),
       sanitizeLowStockLimit(data.lowStockLimit, DEFAULT_LOW_STOCK_LIMIT),
@@ -185,6 +433,7 @@ function normalizeOrder(id: string, data: Record<string, unknown>): Order {
   return {
     id,
     ...data,
+    customerId: (data.customerId as string) || undefined,
     source: (data.source as Order['source']) || 'website_order',
     manualOrderId: (data.manualOrderId as string) || undefined,
     discount: typeof data.discount === 'number' ? data.discount : 0,
@@ -207,6 +456,8 @@ function normalizeInventoryTransaction(id: string, data: Record<string, unknown>
     source: (data.source as InventoryTransaction['source']) || 'ADMIN_STOCK_ADD',
     orderId: (data.orderId as string) || undefined,
     manualOrderId: (data.manualOrderId as string) || undefined,
+    productionBatchId: (data.productionBatchId as string) || undefined,
+    unit: (data.unit as Product['unit']) || getProductUnitForCategory((data.categoryId as string) || ''),
     quantity: sanitizeStockValue(data.quantity),
     previousStock: sanitizeStockValue(data.previousStock),
     newStock: sanitizeStockValue(data.newStock),
@@ -214,6 +465,38 @@ function normalizeInventoryTransaction(id: string, data: Record<string, unknown>
     createdAt: toDateOrNow(data.createdAt),
     createdBy: (data.createdBy as string) || '',
   };
+}
+
+function normalizeUser(id: string, data: Record<string, unknown>): User {
+  const customerType = normalizeCustomerType(data.customerType ?? data.customer_type);
+  return {
+    id,
+    uid: (data.uid as string) || undefined,
+    email: (data.email as string) || '',
+    displayName: (data.displayName as string) || '',
+    phone: (data.phone as string) || '',
+    role: (data.role as User['role']) || 'customer',
+    customerType,
+    customer_type: customerType,
+    addresses: Array.isArray(data.addresses) ? (data.addresses as Address[]) : [],
+    createdAt: toDateOrNow(data.createdAt),
+  };
+}
+
+function compareCustomers(a: User, b: User, sortBy: CustomerSortField, sortDirection: 'asc' | 'desc'): number {
+  const direction = sortDirection === 'asc' ? 1 : -1;
+
+  if (sortBy === 'createdAt') {
+    return (a.createdAt.getTime() - b.createdAt.getTime()) * direction;
+  }
+
+  if (sortBy === 'customerType') {
+    return a.customerType.localeCompare(b.customerType) * direction;
+  }
+
+  const left = (sortBy === 'displayName' ? a.displayName || a.email : a.email).toLowerCase();
+  const right = (sortBy === 'displayName' ? b.displayName || b.email : b.email).toLowerCase();
+  return left.localeCompare(right) * direction;
 }
 
 function normalizeSupplier(id: string, data: Record<string, unknown>): Supplier {
@@ -225,19 +508,6 @@ function normalizeSupplier(id: string, data: Record<string, unknown>): Supplier 
     email: (data.email as string) || '',
     address: (data.address as string) || '',
     gstNumber: (data.gstNumber as string) || '',
-    status: typeof data.status === 'boolean' ? data.status : true,
-    createdAt: toDateOrNow(data.createdAt),
-    updatedAt: toDateOrNow(data.updatedAt),
-  };
-}
-
-function normalizeMaterial(id: string, data: Record<string, unknown>): Material {
-  const rawName = data.name || data.materialName || data.title;
-
-  return {
-    id,
-    name: typeof rawName === 'string' ? rawName.trim() : '',
-    stock: sanitizeStockValue(data.stock),
     status: typeof data.status === 'boolean' ? data.status : true,
     createdAt: toDateOrNow(data.createdAt),
     updatedAt: toDateOrNow(data.updatedAt),
@@ -276,6 +546,7 @@ function normalizeStockTransaction(id: string, data: Record<string, unknown>): S
     productId: (data.productId as string) || '',
     referenceType: (data.referenceType as StockTransaction['referenceType']) || 'purchase',
     referenceId: (data.referenceId as string) || '',
+    unit: (data.unit as Product['unit']) || getProductUnitForCategory((data.categoryId as string) || ''),
     quantity: sanitizeStockValue(data.quantity),
     transactionType: (data.transactionType as StockTransaction['transactionType']) || 'IN',
     createdAt: toDateOrNow(data.createdAt),
@@ -432,22 +703,38 @@ function getPurchaseEmbeddedItems(data: Record<string, unknown>): Array<Pick<Pur
   );
 }
 
+function isManagedCategory(category: Pick<Category, 'slug'>): boolean {
+  return isCoreProductCategorySlug(category.slug);
+}
+
+function assertManagedCategorySlug(slug: string): void {
+  if (!isCoreProductCategorySlug(slug)) {
+    throw new Error('Only raw-material, production, and finished categories are allowed.');
+  }
+}
+
 // ─── Categories ───────────────────────────────────────────────────────────────
 
 export async function getCategories(): Promise<Category[]> {
   const q = query(collection(db, 'categories'), where('active', '==', true), orderBy('order'));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as Category))
+    .filter(isManagedCategory);
 }
 
 export async function getAllCategories(): Promise<Category[]> {
   const q = query(collection(db, 'categories'), orderBy('order'));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as Category))
+    .filter(isManagedCategory);
 }
 
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  const q = query(collection(db, 'categories'), where('slug', '==', slug));
+  const normalizedSlug = normalizeCategorySlug(slug);
+  if (!isCoreProductCategorySlug(normalizedSlug)) return null;
+  const q = query(collection(db, 'categories'), where('slug', '==', normalizedSlug));
   const snap = await getDocs(q);
   if (snap.empty) return null;
   return { id: snap.docs[0].id, ...snap.docs[0].data() } as Category;
@@ -457,7 +744,9 @@ export async function createCategory(
   data: Omit<Category, 'id'>,
   actor?: string | AdminActivityActor,
 ): Promise<string> {
-  const ref = await addDoc(collection(db, 'categories'), { ...data, createdAt: serverTimestamp() });
+  const normalizedSlug = normalizeCategorySlug(data.slug);
+  assertManagedCategorySlug(normalizedSlug);
+  const ref = await addDoc(collection(db, 'categories'), { ...data, slug: normalizedSlug, createdAt: serverTimestamp() });
   await logAdminActivity({
     action: 'create',
     entity: 'category',
@@ -478,7 +767,14 @@ export async function updateCategory(
   data: Partial<Category>,
   actor?: string | AdminActivityActor,
 ): Promise<void> {
-  await updateDoc(doc(db, 'categories', id), { ...data, updatedAt: serverTimestamp() });
+  if (typeof data.slug === 'string') {
+    assertManagedCategorySlug(normalizeCategorySlug(data.slug));
+  }
+  await updateDoc(doc(db, 'categories', id), {
+    ...data,
+    ...(typeof data.slug === 'string' ? { slug: normalizeCategorySlug(data.slug) } : {}),
+    updatedAt: serverTimestamp(),
+  });
   await logAdminActivity({
     action: 'update',
     entity: 'category',
@@ -495,6 +791,10 @@ export async function updateCategory(
 export async function deleteCategory(id: string, actor?: string | AdminActivityActor): Promise<void> {
   const existing = await getDoc(doc(db, 'categories', id));
   const categoryName = existing.exists() ? ((existing.data().name as string) || id) : id;
+  const categorySlug = existing.exists() ? normalizeCategorySlug((existing.data().slug as string) || '') : '';
+  if (categorySlug && CORE_PRODUCT_CATEGORY_SLUGS.has(categorySlug as any)) {
+    throw new Error('Core product categories cannot be deleted.');
+  }
   await deleteDoc(doc(db, 'categories', id));
   await logAdminActivity({
     action: 'delete',
@@ -509,14 +809,11 @@ export async function deleteCategory(id: string, actor?: string | AdminActivityA
 // ─── Products ─────────────────────────────────────────────────────────────────
 
 export async function getProducts(categoryId?: string): Promise<Product[]> {
-  let q;
-  if (categoryId) {
-    q = query(collection(db, 'products'), where('active', '==', true), where('category', '==', categoryId));
-  } else {
-    q = query(collection(db, 'products'), where('active', '==', true));
-  }
+  const q = query(collection(db, 'products'), where('active', '==', true));
   const snap = await getDocs(q);
-  return snap.docs.map(d => normalizeProduct(d.id, d.data()));
+  const products = snap.docs.map(d => normalizeProduct(d.id, d.data()));
+  if (!categoryId) return products;
+  return products.filter((product) => product.categoryId === categoryId);
 }
 
 export async function getAllProducts(): Promise<Product[]> {
@@ -532,11 +829,24 @@ export async function backfillProductStockFields(): Promise<number> {
 
   snap.docs.forEach((productDoc) => {
     const data = productDoc.data() as Record<string, unknown>;
+    const normalizedProduct = normalizeProduct(productDoc.id, data);
+    const currentCategoryId = normalizeCategorySlug(normalizedProduct.categoryId);
     const hasStockQuantity = typeof data.stockQuantity === 'number';
     const hasLowStockLimit = typeof data.lowStockLimit === 'number';
     const hasStockStatus = typeof data.stockStatus === 'string';
     const hasLastStockUpdatedAt = 'lastStockUpdatedAt' in data;
     const hasLastStockUpdatedBy = typeof data.lastStockUpdatedBy === 'string';
+    const hasValidUnit = typeof data.unit === 'string' && data.unit === getProductUnitForCategory(normalizedProduct.categoryId);
+    const currentBottleWeightGram = sanitizeBottleWeightGram(data.bottle_weight_gram);
+    const nextBottleWeightGram = currentCategoryId === PRODUCTION_CATEGORY_SLUG
+      ? inferProductionBottleWeightGram(data)
+      : null;
+    const hasSingleProductFields =
+      typeof data.categoryId === 'string' &&
+      typeof data.description === 'string' &&
+      Array.isArray(data.pricingTiers) &&
+      !('variants' in data) &&
+      !('hasVariants' in data);
     const currentLowStockLimit = sanitizeLowStockLimit(data.lowStockLimit, DEFAULT_LOW_STOCK_LIMIT);
     const currentStockQuantity = sanitizeStockValue(
       data.stockQuantity,
@@ -552,6 +862,10 @@ export async function backfillProductStockFields(): Promise<number> {
       !hasLowStockLimit || sanitizeStockValue(data.lowStockLimit) < DEFAULT_LOW_STOCK_LIMIT;
     const needsStockStatusRefresh =
       !hasStockStatus || (data.stockStatus as string) !== currentStockStatus;
+    const needsBottleWeightRefresh =
+      currentCategoryId === PRODUCTION_CATEGORY_SLUG
+        ? nextBottleWeightGram !== currentBottleWeightGram
+        : 'bottle_weight_gram' in data;
 
     if (
       hasStockQuantity &&
@@ -559,8 +873,11 @@ export async function backfillProductStockFields(): Promise<number> {
       hasStockStatus &&
       hasLastStockUpdatedAt &&
       hasLastStockUpdatedBy &&
+      hasValidUnit &&
+      hasSingleProductFields &&
       !needsLowStockLimitUpgrade &&
       !needsStockStatusRefresh &&
+      !needsBottleWeightRefresh &&
       !isLegacyAutoZeroedStock
     ) {
       return;
@@ -574,6 +891,24 @@ export async function backfillProductStockFields(): Promise<number> {
     });
 
     batch.update(productDoc.ref, {
+      categoryId: normalizedProduct.categoryId,
+      category: normalizedProduct.categoryId,
+      unit: normalizedProduct.unit,
+      description: normalizedProduct.description,
+      images: normalizedProduct.images,
+      sku: normalizedProduct.sku,
+      capacity: normalizedProduct.capacity,
+      neckSize: normalizedProduct.neckSize,
+      height: normalizedProduct.height,
+      weight: normalizedProduct.weight,
+      material: normalizedProduct.material,
+      packagingSize: normalizedProduct.packagingSize,
+      color: normalizedProduct.color,
+      remark: normalizedProduct.remark,
+      ...(currentCategoryId === PRODUCTION_CATEGORY_SLUG && nextBottleWeightGram != null
+        ? { bottle_weight_gram: nextBottleWeightGram }
+        : { bottle_weight_gram: deleteField() }),
+      pricingTiers: normalizedProduct.pricingTiers,
       ...stockFields,
       lastStockUpdatedAt:
         isLegacyAutoZeroedStock
@@ -587,6 +922,8 @@ export async function backfillProductStockFields(): Promise<number> {
           : hasLastStockUpdatedBy
             ? data.lastStockUpdatedBy
             : '',
+      variants: [],
+      hasVariants: false,
       updatedAt: serverTimestamp(),
     });
     updates += 1;
@@ -639,9 +976,21 @@ export async function createProduct(
   },
   actor?: string | AdminActivityActor,
 ): Promise<string> {
+  const sanitizedData = sanitizeProductWriteData(data);
+  assertValidPricingTiers((sanitizedData.pricingTiers as Product['pricingTiers']) || []);
+  const resolvedCategoryId = (sanitizedData.categoryId as string) || data.categoryId;
+  const bottleWeightGram = resolveProductBottleWeightGram(
+    resolvedCategoryId,
+    sanitizedData.bottle_weight_gram ?? data.bottle_weight_gram,
+  );
+  assertValidProductBottleWeight(resolvedCategoryId, bottleWeightGram);
   const stockFields = resolveProductStockFields(data);
+  const { bottle_weight_gram: _unusedBottleWeight, ...restData } = data;
   const ref = await addDoc(collection(db, 'products'), {
-    ...data,
+    ...restData,
+    ...sanitizedData,
+    unit: getProductUnitForCategory(resolvedCategoryId),
+    ...(bottleWeightGram != null ? { bottle_weight_gram: bottleWeightGram } : {}),
     ...stockFields,
     lastStockUpdatedAt: data.lastStockUpdatedAt ?? new Date(),
     lastStockUpdatedBy: data.lastStockUpdatedBy || 'admin',
@@ -656,7 +1005,7 @@ export async function createProduct(
     message: `Created product "${data.name}"`,
     actor: actor || data.lastStockUpdatedBy,
     metadata: {
-      category: data.category,
+      categoryId: data.categoryId,
       stockQuantity: stockFields.stockQuantity,
       active: data.active,
     },
@@ -675,12 +1024,31 @@ export async function updateProduct(
   }
 
   const stockFields = resolveProductStockFields(data, existing);
+  const sanitizedData = sanitizeProductWriteData(data);
+  const resolvedCategoryId = (sanitizedData.categoryId as string) || existing.categoryId;
+  const nextPricingTiers = (sanitizedData.pricingTiers as Product['pricingTiers']) || existing.pricingTiers;
+  const nextBottleWeightGram = resolveProductBottleWeightGram(
+    resolvedCategoryId,
+    sanitizedData.bottle_weight_gram ?? data.bottle_weight_gram ?? existing.bottle_weight_gram,
+  );
+  if (
+    isProductionProductCategorySlug(resolvedCategoryId) &&
+    (resolvedCategoryId !== existing.categoryId || 'categoryId' in data || 'bottle_weight_gram' in data)
+  ) {
+    assertValidProductBottleWeight(resolvedCategoryId, nextBottleWeightGram);
+  }
+  assertValidPricingTiers(nextPricingTiers);
   const stockChanged =
     stockFields.stockQuantity !== existing.stockQuantity ||
     stockFields.lowStockLimit !== existing.lowStockLimit;
 
   await updateDoc(doc(db, 'products', id), {
     ...data,
+    ...sanitizedData,
+    unit: getProductUnitForCategory(resolvedCategoryId),
+    ...(isProductionProductCategorySlug(resolvedCategoryId)
+      ? { bottle_weight_gram: nextBottleWeightGram }
+      : { bottle_weight_gram: deleteField() }),
     ...stockFields,
     lastStockUpdatedAt: stockChanged ? new Date() : existing.lastStockUpdatedAt ?? null,
     lastStockUpdatedBy: stockChanged ? data.lastStockUpdatedBy || existing.lastStockUpdatedBy || 'admin' : existing.lastStockUpdatedBy || '',
@@ -694,11 +1062,11 @@ export async function updateProduct(
     message: `Updated product "${data.name || existing.name}"`,
     actor: actor || data.lastStockUpdatedBy,
     metadata: {
-      updatedFields: Object.keys(data).join(', ') || 'none',
-      stockChanged,
-      previousStock: existing.stockQuantity,
-      newStock: stockFields.stockQuantity,
-      active: typeof data.active === 'boolean' ? data.active : existing.active,
+        updatedFields: Object.keys(data).join(', ') || 'none',
+        stockChanged,
+        previousStock: existing.stockQuantity,
+        newStock: stockFields.stockQuantity,
+        active: typeof data.active === 'boolean' ? data.active : existing.active,
     },
   });
 }
@@ -715,7 +1083,7 @@ export async function deleteProduct(id: string, actor?: string | AdminActivityAc
     actor,
     metadata: existing
       ? {
-          category: existing.category,
+          categoryId: existing.categoryId,
           active: existing.active,
         }
       : undefined,
@@ -728,92 +1096,6 @@ export async function getAllSuppliers(): Promise<Supplier[]> {
   const q = query(collection(db, 'suppliers'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map((docSnap) => normalizeSupplier(docSnap.id, docSnap.data()));
-}
-
-export async function getAllMaterials(): Promise<Material[]> {
-  const q = query(collection(db, 'materials'), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map((docSnap) => normalizeMaterial(docSnap.id, docSnap.data()));
-}
-
-export async function getMaterialById(id: string): Promise<Material | null> {
-  const snap = await getDoc(doc(db, 'materials', id));
-  if (!snap.exists()) return null;
-  return normalizeMaterial(snap.id, snap.data());
-}
-
-export async function createMaterial(
-  data: Omit<Material, 'id' | 'createdAt' | 'updatedAt'>,
-  actor?: string | AdminActivityActor,
-): Promise<string> {
-  const materialName = data.name.trim();
-  const ref = await addDoc(collection(db, 'materials'), {
-    name: materialName,
-    stock: sanitizeStockValue(data.stock),
-    status: data.status,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-
-  await logAdminActivity({
-    action: 'create',
-    entity: 'material',
-    entityId: ref.id,
-    entityLabel: materialName,
-    message: `Created material "${materialName}"`,
-    actor,
-    metadata: {
-      stock: sanitizeStockValue(data.stock),
-      active: data.status,
-    },
-  });
-
-  return ref.id;
-}
-
-export async function updateMaterial(
-  id: string,
-  data: Partial<Omit<Material, 'id' | 'createdAt' | 'updatedAt'>>,
-  actor?: string | AdminActivityActor,
-): Promise<void> {
-  const existing = await getMaterialById(id);
-  if (!existing) {
-    throw new Error('Material not found.');
-  }
-
-  await updateDoc(doc(db, 'materials', id), {
-    ...data,
-    ...(typeof data.name === 'string' ? { name: data.name.trim() } : {}),
-    ...(typeof data.stock === 'number' ? { stock: sanitizeStockValue(data.stock) } : {}),
-    updatedAt: serverTimestamp(),
-  });
-
-  await logAdminActivity({
-    action: 'update',
-    entity: 'material',
-    entityId: id,
-    entityLabel: data.name?.trim() || existing.name,
-    message: `Updated material "${data.name?.trim() || existing.name}"`,
-    actor,
-    metadata: {
-      updatedFields: Object.keys(data).join(', ') || 'none',
-      stock: typeof data.stock === 'number' ? sanitizeStockValue(data.stock) : null,
-      active: typeof data.status === 'boolean' ? data.status : null,
-    },
-  });
-}
-
-export async function deleteMaterial(id: string, actor?: string | AdminActivityActor): Promise<void> {
-  const existing = await getMaterialById(id);
-  await deleteDoc(doc(db, 'materials', id));
-  await logAdminActivity({
-    action: 'delete',
-    entity: 'material',
-    entityId: id,
-    entityLabel: existing?.name || id,
-    message: `Deleted material "${existing?.name || id}"`,
-    actor,
-  });
 }
 
 export async function getSupplierById(id: string): Promise<Supplier | null> {
@@ -991,6 +1273,7 @@ export async function createPurchase(
       transaction.set(doc(inventoryCollectionRef), {
         productId: product.id,
         productName: product.name,
+        unit: product.unit,
         type: 'IN',
         source: 'PURCHASE',
         quantity: aggregatedItem.quantity,
@@ -1005,6 +1288,7 @@ export async function createPurchase(
         productId: product.id,
         referenceType: 'purchase',
         referenceId: purchaseRef.id,
+        unit: product.unit,
         quantity: aggregatedItem.quantity,
         transactionType: 'IN',
         createdAt: serverTimestamp(),
@@ -1156,6 +1440,7 @@ export async function updatePurchase(
       transaction.set(doc(inventoryCollectionRef), {
         productId: state.product.id,
         productName: state.product.name,
+        unit: state.product.unit,
         type: transactionType,
         source,
         quantity,
@@ -1170,6 +1455,7 @@ export async function updatePurchase(
         productId: state.product.id,
         referenceType: 'purchase',
         referenceId: id,
+        unit: state.product.unit,
         quantity,
         transactionType,
         createdAt: serverTimestamp(),
@@ -1309,6 +1595,7 @@ export async function deletePurchase(id: string, actor?: string | AdminActivityA
       transaction.set(doc(inventoryCollectionRef), {
         productId: product.id,
         productName: product.name,
+        unit: product.unit,
         type: 'OUT',
         source: 'PURCHASE_DELETE',
         quantity: aggregatedItem.quantity,
@@ -1323,6 +1610,7 @@ export async function deletePurchase(id: string, actor?: string | AdminActivityA
         productId: product.id,
         referenceType: 'purchase',
         referenceId: id,
+        unit: product.unit,
         quantity: aggregatedItem.quantity,
         transactionType: 'OUT',
         createdAt: serverTimestamp(),
@@ -1346,6 +1634,184 @@ export async function deletePurchase(id: string, actor?: string | AdminActivityA
   });
 }
 
+async function updateLegacyCustomerType(docId: string, currentType: unknown): Promise<void> {
+  if (currentType === 'website' || currentType === 'manual') return;
+  await updateDoc(doc(db, 'users', docId), {
+    customerType: 'website',
+    customer_type: 'website',
+  });
+}
+
+async function migrateLegacyCustomersCustomerType(
+  docs: Array<{ id: string; data: () => Record<string, unknown> }>
+): Promise<void> {
+  const docsToUpdate = docs.filter((docSnap) => {
+    const currentType = docSnap.data().customerType;
+    return currentType !== 'website' && currentType !== 'manual';
+  });
+
+  if (docsToUpdate.length === 0) return;
+
+  const batch = writeBatch(db);
+  docsToUpdate.forEach((docSnap) => {
+    batch.update(doc(db, 'users', docSnap.id), {
+      customerType: 'website',
+      customer_type: 'website',
+    });
+  });
+  await batch.commit();
+}
+
+async function findCustomerProfile(
+  email?: string,
+  phone?: string,
+): Promise<{ user: User; matchedBy: 'email' | 'phone' } | null> {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPhone = normalizePhone(phone);
+
+  if (normalizedEmail) {
+    const emailQuery = query(collection(db, 'users'), where('email', '==', normalizedEmail), limit(1));
+    const emailSnap = await getDocs(emailQuery);
+    if (!emailSnap.empty) {
+      const docSnap = emailSnap.docs[0];
+      await updateLegacyCustomerType(docSnap.id, docSnap.data().customerType);
+      return {
+        user: normalizeUser(docSnap.id, docSnap.data() as Record<string, unknown>),
+        matchedBy: 'email',
+      };
+    }
+  }
+
+  if (normalizedPhone) {
+    const phoneQuery = query(collection(db, 'users'), where('phone', '==', normalizedPhone), limit(1));
+    const phoneSnap = await getDocs(phoneQuery);
+    if (!phoneSnap.empty) {
+      const docSnap = phoneSnap.docs[0];
+      await updateLegacyCustomerType(docSnap.id, docSnap.data().customerType);
+      return {
+        user: normalizeUser(docSnap.id, docSnap.data() as Record<string, unknown>),
+        matchedBy: 'phone',
+      };
+    }
+  }
+
+  if (normalizedEmail || normalizedPhone) {
+    const allUsersSnap = await getDocs(collection(db, 'users'));
+    const matchedDoc = allUsersSnap.docs.find((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      return (
+        (normalizedEmail && normalizeEmail(data.email) === normalizedEmail) ||
+        (normalizedPhone && normalizePhone(data.phone) === normalizedPhone)
+      );
+    });
+
+    if (matchedDoc) {
+      await updateLegacyCustomerType(matchedDoc.id, matchedDoc.data().customerType);
+      return {
+        user: normalizeUser(matchedDoc.id, matchedDoc.data() as Record<string, unknown>),
+        matchedBy:
+          normalizedEmail && normalizeEmail(matchedDoc.data().email) === normalizedEmail ? 'email' : 'phone',
+      };
+    }
+  }
+
+  return null;
+}
+
+async function syncCustomerProfile(input: CustomerSyncInput): Promise<User> {
+  const normalizedEmail = normalizeEmail(input.email);
+  const normalizedPhone = normalizePhone(input.phone);
+  const trimmedName = input.displayName?.trim() || '';
+  const trimmedUid = input.uid?.trim() || '';
+  const customerType = input.customerType;
+
+  let existingUser: User | null = null;
+  let matchedBy: 'uid' | 'email' | 'phone' | null = null;
+
+  if (trimmedUid) {
+    const uidQuery = query(collection(db, 'users'), where('uid', '==', trimmedUid), limit(1));
+    const uidSnap = await getDocs(uidQuery);
+    if (!uidSnap.empty) {
+      const docSnap = uidSnap.docs[0];
+      await updateLegacyCustomerType(docSnap.id, docSnap.data().customerType);
+      existingUser = normalizeUser(docSnap.id, docSnap.data() as Record<string, unknown>);
+      matchedBy = 'uid';
+    }
+  }
+
+  if (!existingUser) {
+    const matchedCustomer = await findCustomerProfile(normalizedEmail, normalizedPhone);
+    existingUser = matchedCustomer?.user || null;
+    matchedBy = matchedCustomer?.matchedBy || null;
+  }
+
+  const nextCustomerType: CustomerType =
+    existingUser?.customerType === 'website' || customerType === 'website' ? 'website' : 'manual';
+  const nextAddresses = mergeAddresses(existingUser?.addresses, input.address);
+
+  if (existingUser) {
+    const payload: Record<string, unknown> = {
+      customerType: nextCustomerType,
+      customer_type: nextCustomerType,
+      addresses: nextAddresses,
+    };
+
+    if (trimmedUid && existingUser.uid !== trimmedUid) payload.uid = trimmedUid;
+    if (
+      normalizedEmail &&
+      existingUser.email !== normalizedEmail &&
+      (matchedBy === 'uid' || matchedBy === 'email' || !existingUser.email)
+    ) {
+      payload.email = normalizedEmail;
+    }
+    if (normalizedPhone && existingUser.phone !== normalizedPhone) payload.phone = normalizedPhone;
+    if (trimmedName && existingUser.displayName !== trimmedName) payload.displayName = trimmedName;
+
+    if (Object.keys(payload).length > 0) {
+      await updateDoc(doc(db, 'users', existingUser.id), payload);
+    }
+
+    return {
+      ...existingUser,
+      uid: trimmedUid || existingUser.uid,
+      email:
+        normalizedEmail && (matchedBy === 'uid' || matchedBy === 'email' || !existingUser.email)
+          ? normalizedEmail
+          : existingUser.email,
+      phone: normalizedPhone || existingUser.phone,
+      displayName: trimmedName || existingUser.displayName,
+      customerType: nextCustomerType,
+      addresses: nextAddresses,
+    };
+  }
+
+  const newUser = {
+    ...(trimmedUid ? { uid: trimmedUid } : {}),
+    email: normalizedEmail,
+    displayName: trimmedName,
+    ...(normalizedPhone ? { phone: normalizedPhone } : {}),
+    role: 'customer' as const,
+    customerType,
+    customer_type: customerType,
+    addresses: nextAddresses,
+    createdAt: serverTimestamp(),
+  };
+
+  const ref = await addDoc(collection(db, 'users'), newUser);
+  return {
+    id: ref.id,
+    uid: trimmedUid || undefined,
+    email: normalizedEmail,
+    displayName: trimmedName,
+    phone: normalizedPhone || '',
+    role: 'customer',
+    customerType,
+    customer_type: customerType,
+    addresses: nextAddresses,
+    createdAt: new Date(),
+  };
+}
+
 export async function createOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   const ref = await addDoc(collection(db, 'orders'), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   return ref.id;
@@ -1354,6 +1820,14 @@ export async function createOrder(data: Omit<Order, 'id' | 'createdAt' | 'update
 export async function createWebsiteOrderWithInventory(
   data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>,
 ): Promise<string> {
+  const customer = await syncCustomerProfile({
+    uid: data.userId,
+    email: data.userEmail,
+    phone: data.shippingAddress.phone,
+    displayName: data.shippingAddress.fullName,
+    address: data.shippingAddress,
+    customerType: 'website',
+  });
   const orderRef = doc(collection(db, 'orders'));
   const inventoryCollectionRef = collection(db, 'inventoryTransactions');
 
@@ -1413,6 +1887,7 @@ export async function createWebsiteOrderWithInventory(
       transaction.set(inventoryRef, {
         productId: product.id,
         productName: product.name,
+        unit: product.unit,
         type: 'OUT',
         source: 'WEBSITE_ORDER',
         orderId: orderRef.id,
@@ -1426,6 +1901,7 @@ export async function createWebsiteOrderWithInventory(
 
     transaction.set(orderRef, {
       ...data,
+      customerId: customer.id,
       source: data.source || 'website_order',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -1439,6 +1915,13 @@ export async function createManualSaleWithInventory(
   data: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'source' | 'manualOrderId' | 'challanId'>,
   createdBy: string,
 ): Promise<string> {
+  const customer = await syncCustomerProfile({
+    email: data.userEmail,
+    phone: data.shippingAddress.phone,
+    displayName: data.shippingAddress.fullName,
+    address: data.shippingAddress,
+    customerType: 'manual',
+  });
   const orderRef = doc(collection(db, 'orders'));
   const inventoryCollectionRef = collection(db, 'inventoryTransactions');
 
@@ -1498,6 +1981,7 @@ export async function createManualSaleWithInventory(
       transaction.set(inventoryRef, {
         productId: product.id,
         productName: product.name,
+        unit: product.unit,
         type: 'OUT',
         source: 'MANUAL_SALE',
         manualOrderId: orderRef.id,
@@ -1511,6 +1995,7 @@ export async function createManualSaleWithInventory(
 
     transaction.set(orderRef, {
       ...data,
+      customerId: customer.id,
       source: 'manual_sale',
       manualOrderId: orderRef.id,
       createdAt: serverTimestamp(),
@@ -1576,6 +2061,7 @@ export async function addInventoryStock(
     transaction.set(inventoryRef, {
       productId: product.id,
       productName: product.name,
+      unit: product.unit,
       type: 'IN',
       source: 'ADMIN_STOCK_ADD',
       quantity: safeQuantity,
@@ -1593,7 +2079,7 @@ export async function addInventoryStock(
     entity: 'inventory',
     entityId: productId,
     entityLabel: product?.name || productId,
-    message: `Added ${quantity} unit(s) to "${product?.name || productId}"`,
+    message: `Added ${quantity} ${(product?.unit || 'gram').toUpperCase()} to "${product?.name || productId}"`,
     actor: createdBy,
     metadata: {
       quantity,
@@ -1601,6 +2087,234 @@ export async function addInventoryStock(
       newStock: product?.stockQuantity ?? null,
     },
   });
+}
+
+export async function saveProductionEntryWithInventory(
+  data: SaveProductionEntryInput,
+  createdBy: string,
+): Promise<{
+  productionId: string;
+  productId: string;
+  productName: string;
+  finishedInventoryTransactionId: string;
+  rawMaterialInventoryTransactionIds: string[];
+  productionWeightGrams: number;
+  productionWeightKg: number;
+  quantityProducedBottles: number;
+}> {
+  const safeBottleCount = Math.max(0, Math.floor(sanitizeStockValue(data.quantityProducedBottles)));
+  if (safeBottleCount <= 0) {
+    throw new Error('Quantity produced must be greater than 0.');
+  }
+
+  const normalizedRawMaterials = data.rawMaterials
+    .map((item) => ({
+      productId: item.productId.trim(),
+      productName: item.productName.trim(),
+      quantityKg: sanitizeStockValue(item.quantityKg),
+    }))
+    .filter((item) => item.productId && item.quantityKg > 0);
+
+  if (normalizedRawMaterials.length === 0) {
+    throw new Error('Add at least one raw material.');
+  }
+
+  const aggregatedRawMaterials = Array.from(
+    normalizedRawMaterials.reduce<Map<string, ProductionConsumptionItemInput>>((map, item) => {
+      const existing = map.get(item.productId);
+      if (existing) {
+        existing.quantityKg += item.quantityKg;
+        return map;
+      }
+
+      map.set(item.productId, { ...item });
+      return map;
+    }, new Map()).values(),
+  );
+
+  const productionRef = doc(collection(db, 'production'));
+  const finishedInventoryRef = doc(collection(db, 'inventoryTransactions'));
+  const rawMaterialInventoryRefs = aggregatedRawMaterials.map((item) => ({
+    item,
+    ref: doc(collection(db, 'inventoryTransactions')),
+  }));
+
+  let savedProductName = '';
+  let productionWeightGrams = 0;
+  let productionWeightKg = 0;
+  const rawMaterialInventoryTransactionIds = rawMaterialInventoryRefs.map((entry) => entry.ref.id);
+
+  await runTransaction(db, async (transaction) => {
+    const productRef = doc(db, 'products', data.productId);
+    const productSnap = await transaction.get(productRef);
+
+    if (!productSnap.exists()) {
+      throw new Error('Selected production product could not be found.');
+    }
+
+    const product = normalizeProduct(productSnap.id, productSnap.data() as Record<string, unknown>);
+    savedProductName = product.name;
+
+    if (!isProductionProductCategorySlug(product.categoryId)) {
+      throw new Error('Selected product is not a production product.');
+    }
+
+    const bottleWeightGram = sanitizeBottleWeightGram(product.bottle_weight_gram);
+    if (!bottleWeightGram || bottleWeightGram <= 0) {
+      throw new Error('Selected production product does not have a valid bottle weight.');
+    }
+
+    productionWeightGrams = safeBottleCount * bottleWeightGram;
+    productionWeightKg = productionWeightGrams / 1000;
+
+    const currentProductStock = sanitizeStockValue(product.stockQuantity);
+    const newProductStock = currentProductStock + productionWeightGrams;
+
+    const rawMaterialSnapshots = await Promise.all(
+      aggregatedRawMaterials.map(async (item) => {
+        const rawMaterialRef = doc(db, 'products', item.productId);
+        const rawMaterialSnap = await transaction.get(rawMaterialRef);
+
+        if (!rawMaterialSnap.exists()) {
+          throw new Error('One of the selected raw materials could not be found.');
+        }
+
+        const rawMaterialProduct = normalizeProduct(rawMaterialSnap.id, rawMaterialSnap.data() as Record<string, unknown>);
+        if (!isCoreProductCategorySlug(rawMaterialProduct.categoryId) || rawMaterialProduct.categoryId !== 'raw-material') {
+          throw new Error('One of the selected items is not a raw material product.');
+        }
+
+        const currentStock = sanitizeStockValue(rawMaterialProduct.stockQuantity);
+        const requiredStock = sanitizeStockValue(item.quantityKg);
+
+        if (currentStock < requiredStock) {
+          throw new Error('Insufficient raw material stock.');
+        }
+
+        return {
+          item,
+          rawMaterialProduct,
+          rawMaterialRef,
+          currentStock,
+          requiredStock,
+        };
+      }),
+    );
+
+    rawMaterialSnapshots.forEach(({ item, rawMaterialProduct, rawMaterialRef, currentStock, requiredStock }) => {
+      const newStock = currentStock - requiredStock;
+      if (newStock < 0) {
+        throw new Error('Insufficient raw material stock.');
+      }
+
+      transaction.update(rawMaterialRef, {
+        ...resolveProductStockFields({
+          stockQuantity: newStock,
+          lowStockLimit: rawMaterialProduct.lowStockLimit,
+        }),
+        lastStockUpdatedAt: serverTimestamp(),
+        lastStockUpdatedBy: createdBy,
+        updatedAt: serverTimestamp(),
+      });
+
+      const inventoryRef = rawMaterialInventoryRefs.find((entry) => entry.item.productId === item.productId)?.ref;
+      if (inventoryRef) {
+        transaction.set(inventoryRef, {
+          productId: rawMaterialProduct.id,
+          productName: rawMaterialProduct.name,
+          productionBatchId: productionRef.id,
+          unit: 'kg',
+          type: 'OUT',
+          source: 'PRODUCTION_CONSUMPTION',
+          quantity: requiredStock,
+          previousStock: currentStock,
+          newStock,
+          note: `Consumed in production batch ${productionRef.id} (${data.productionDate})`,
+          createdAt: serverTimestamp(),
+          createdBy,
+        });
+      }
+    });
+
+    transaction.update(productRef, {
+      ...resolveProductStockFields({
+        stockQuantity: newProductStock,
+        lowStockLimit: product.lowStockLimit,
+      }),
+      lastStockUpdatedAt: serverTimestamp(),
+      lastStockUpdatedBy: createdBy,
+      updatedAt: serverTimestamp(),
+    });
+
+    transaction.set(productionRef, {
+      productId: product.id,
+      productName: product.name,
+      productionQty: safeBottleCount,
+      quantityProducedBottles: safeBottleCount,
+      bottleWeightGram,
+      productionWeightGrams,
+      productionWeightKg,
+      productionDate: data.productionDate,
+      notes: data.notes?.trim() || '',
+      rawMaterials: aggregatedRawMaterials.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        qty: item.quantityKg,
+      })),
+      rawMaterialConsumption: aggregatedRawMaterials.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        qty: item.quantityKg,
+      })),
+      finishedInventoryTransactionId: finishedInventoryRef.id,
+      rawMaterialInventoryTransactionIds,
+      createdBy,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    transaction.set(finishedInventoryRef, {
+      productId: product.id,
+      productName: product.name,
+      productionBatchId: productionRef.id,
+      unit: 'gram',
+      type: 'IN',
+      source: 'PRODUCTION',
+      quantity: productionWeightGrams,
+      previousStock: currentProductStock,
+      newStock: newProductStock,
+      note: `Production batch ${productionRef.id} (${data.productionDate})`,
+      createdAt: serverTimestamp(),
+      createdBy,
+    });
+  });
+
+  await logAdminActivity({
+    action: 'stock_add',
+    entity: 'inventory',
+    entityId: productionRef.id,
+    entityLabel: savedProductName || data.productId,
+    message: `Recorded production stock movement for "${savedProductName || data.productId}"`,
+    actor: createdBy,
+    metadata: {
+      productId: data.productId,
+      quantityProducedBottles: safeBottleCount,
+      productionWeightGrams,
+      productionWeightKg,
+      rawMaterialLines: aggregatedRawMaterials.length,
+    },
+  });
+
+  return {
+    productionId: productionRef.id,
+    productId: data.productId,
+    productName: savedProductName,
+    finishedInventoryTransactionId: finishedInventoryRef.id,
+    rawMaterialInventoryTransactionIds,
+    productionWeightGrams,
+    productionWeightKg,
+    quantityProducedBottles: safeBottleCount,
+  };
 }
 
 export async function getInventoryTransactions(): Promise<InventoryTransaction[]> {
@@ -1727,6 +2441,7 @@ export async function updateOrderStatus(
         transaction.set(inventoryRef, {
           productId: product.id,
           productName: product.name,
+          unit: product.unit,
           type: 'IN',
           source: 'ORDER_CANCELLATION',
           orderId: order.id,
@@ -1774,6 +2489,7 @@ export async function updateOrderStatus(
         transaction.set(inventoryRef, {
           productId: product.id,
           productName: product.name,
+          unit: product.unit,
           type: 'OUT',
           source: 'ORDER_REACTIVATION',
           orderId: order.id,
@@ -1878,11 +2594,10 @@ export async function generateDeliveryChallanFromOrder(orderId: string, createdB
 }
 
 export async function getOrderItemStockIssues(
-  items: Pick<OrderItem, 'productId' | 'productName' | 'quantity' | 'variantId'>[],
+  items: Pick<OrderItem, 'productId' | 'productName' | 'quantity'>[],
 ): Promise<Array<{
   productId: string;
   productName: string;
-  variantId: string;
   requestedQuantity: number;
   stockQuantity: number;
   reason: 'missing_product' | 'out_of_stock' | 'insufficient_stock';
@@ -1891,7 +2606,6 @@ export async function getOrderItemStockIssues(
   const issues: Array<{
     productId: string;
     productName: string;
-    variantId: string;
     requestedQuantity: number;
     stockQuantity: number;
     reason: 'missing_product' | 'out_of_stock' | 'insufficient_stock';
@@ -1904,7 +2618,6 @@ export async function getOrderItemStockIssues(
       issues.push({
         productId: item.productId,
         productName: item.productName,
-        variantId: item.variantId,
         requestedQuantity: item.quantity,
         stockQuantity: 0,
         reason: 'missing_product',
@@ -1916,7 +2629,6 @@ export async function getOrderItemStockIssues(
       issues.push({
         productId: item.productId,
         productName: item.productName,
-        variantId: item.variantId,
         requestedQuantity: item.quantity,
         stockQuantity: product.stockQuantity,
         reason: 'out_of_stock',
@@ -1928,7 +2640,6 @@ export async function getOrderItemStockIssues(
       issues.push({
         productId: item.productId,
         productName: item.productName,
-        variantId: item.variantId,
         requestedQuantity: item.quantity,
         stockQuantity: product.stockQuantity,
         reason: 'insufficient_stock',
@@ -2192,32 +2903,102 @@ export async function deleteDeliveryChallan(id: string, actor?: string | AdminAc
 }
 
 export async function createUserProfile(uid: string, data: Omit<User, 'id' | 'createdAt'>): Promise<void> {
-  await addDoc(collection(db, 'users'), { uid, ...data, createdAt: serverTimestamp() });
+  await addDoc(collection(db, 'users'), {
+    uid,
+    ...data,
+    email: normalizeEmail(data.email),
+    phone: normalizePhone(data.phone),
+    customerType: data.customerType || 'website',
+    customer_type: data.customerType || data.customer_type || 'website',
+    createdAt: serverTimestamp(),
+  });
 }
 
 export async function getUserProfile(uid: string): Promise<User | null> {
   const q = query(collection(db, 'users'), where('uid', '==', uid));
   const snap = await getDocs(q);
   if (snap.empty) return null;
-  const data = snap.docs[0].data();
-  return { id: snap.docs[0].id, ...data, createdAt: data.createdAt?.toDate?.() ?? new Date() } as unknown as User;
+  const docSnap = snap.docs[0];
+  await updateLegacyCustomerType(docSnap.id, docSnap.data().customerType);
+  return normalizeUser(docSnap.id, docSnap.data() as Record<string, unknown>);
+}
+
+export async function getUserById(id: string): Promise<User | null> {
+  const snap = await getDoc(doc(db, 'users', id));
+  if (!snap.exists()) return null;
+  await updateLegacyCustomerType(snap.id, snap.data().customerType);
+  return normalizeUser(snap.id, snap.data() as Record<string, unknown>);
 }
 
 export async function updateUserProfile(uid: string, data: Partial<User>): Promise<void> {
   const q = query(collection(db, 'users'), where('uid', '==', uid));
   const snap = await getDocs(q);
   if (!snap.empty) {
-    await updateDoc(snap.docs[0].ref, data);
+    const payload: Record<string, unknown> = {
+      ...data,
+      customerType: data.customerType || 'website',
+      customer_type: data.customerType || data.customer_type || 'website',
+    };
+    if (typeof data.email === 'string') payload.email = normalizeEmail(data.email);
+    if (typeof data.phone === 'string') payload.phone = normalizePhone(data.phone);
+    await updateDoc(snap.docs[0].ref, payload);
   }
 }
 
-export async function getAllUsers(): Promise<User[]> {
+export async function getAllUsers(filter: CustomerTypeFilter = 'all'): Promise<User[]> {
   const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
-  return snap.docs.map(d => {
-    const data = d.data();
-    return { id: d.id, ...data, createdAt: data.createdAt?.toDate?.() ?? new Date() } as unknown as User;
-  });
+  await migrateLegacyCustomersCustomerType(snap.docs as any[]);
+
+  const users = snap.docs.map((docSnap) => normalizeUser(docSnap.id, docSnap.data() as Record<string, unknown>));
+  if (filter === 'all') return users;
+  return users.filter((user) => user.customerType === filter);
+}
+
+export async function getCustomerList(options: CustomerListOptions = {}): Promise<CustomerListResult> {
+  const {
+    customerType = 'all',
+    search = '',
+    sortBy = 'createdAt',
+    sortDirection = 'desc',
+    page = 1,
+    pageSize = 10,
+  } = options;
+
+  const users = await getAllUsers(customerType);
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredUsers = normalizedSearch
+    ? users.filter((user) => {
+        const sourceLabel = user.customerType === 'manual' ? 'manual order' : 'website registration checkout';
+        return [
+          user.displayName,
+          user.email,
+          user.phone || '',
+          user.customerType,
+          sourceLabel,
+        ].some((value) => value.toLowerCase().includes(normalizedSearch));
+      })
+    : users;
+
+  const sortedUsers = [...filteredUsers].sort((left, right) =>
+    compareCustomers(left, right, sortBy, sortDirection),
+  );
+
+  const safePageSize = Math.max(1, pageSize);
+  const totalCount = sortedUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / safePageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const startIndex = (safePage - 1) * safePageSize;
+  const pagedUsers = sortedUsers.slice(startIndex, startIndex + safePageSize);
+
+  return {
+    users: pagedUsers,
+    totalCount,
+    totalPages,
+    page: safePage,
+    pageSize: safePageSize,
+  };
 }
 
 export async function getTeamMemberProfile(uid: string): Promise<TeamMember | null> {

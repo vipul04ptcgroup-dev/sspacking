@@ -1,0 +1,33 @@
+-- Firestore is the primary datastore used by this repository.
+-- This migration documents the production-completion schema additions used
+-- by the application layer for traceable stock movement and reporting.
+--
+-- If mirrored SQL tables exist, apply changes similar to:
+--
+--   ALTER TABLE inventory_transactions
+--     ADD COLUMN production_batch_id VARCHAR(191) NULL;
+--
+--   ALTER TABLE production
+--     ADD COLUMN quantity_produced_bottles INT NOT NULL DEFAULT 0,
+--     ADD COLUMN bottle_weight_gram INT NOT NULL DEFAULT 0,
+--     ADD COLUMN production_weight_grams DECIMAL(12,3) NOT NULL DEFAULT 0,
+--     ADD COLUMN production_weight_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+--     ADD COLUMN finished_inventory_transaction_id VARCHAR(191) NULL,
+--     ADD COLUMN created_by VARCHAR(191) NULL;
+--
+-- Raw material consumption remains stored as line items/JSON in Firestore and
+-- is surfaced in reporting as the consumed KG per raw material.
+--
+-- Firestore write-path fields added by the application:
+-- inventoryTransactions:
+--   - productionBatchId
+-- production:
+--   - quantityProducedBottles
+--   - bottleWeightGram
+--   - productionWeightGrams
+--   - productionWeightKg
+--   - rawMaterialConsumption
+--   - finishedInventoryTransactionId
+--   - rawMaterialInventoryTransactionIds
+--   - createdBy
+--   - updatedAt

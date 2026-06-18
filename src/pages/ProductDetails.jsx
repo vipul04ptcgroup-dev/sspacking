@@ -1,27 +1,22 @@
-import { useState } from "react";
-
 const product = {
   _id: "1",
   name: "Bottle",
   image: "https://via.placeholder.com/300",
-  variants: [
-    { size: "250ml", material: "Plastic", price: 20, stock: 10 },
-    { size: "250ml", material: "Glass", price: 30, stock: 5 },
-    { size: "500ml", material: "Plastic", price: 25, stock: 8 },
-    { size: "500ml", material: "Glass", price: 40, stock: 2 },
+  sku: "BOTTLE-001",
+  unit: "gram",
+  stockQuantity: 10,
+  capacity: "500ml",
+  material: "Plastic",
+  color: "Clear",
+  pricingTiers: [
+    { minQty: 1, maxQty: 99, unitPrice: 25 },
+    { minQty: 100, maxQty: 499, unitPrice: 22 },
+    { minQty: 500, maxQty: 999, unitPrice: 20 },
   ],
 };
 
 const ProductDetails = () => {
-  const [selectedSize, setSelectedSize] = useState("");
-  const [selectedMaterial, setSelectedMaterial] = useState("");
-
-  const sizes = [...new Set(product.variants.map((variant) => variant.size))];
-  const materials = [...new Set(product.variants.map((variant) => variant.material))];
-
-  const selectedVariant = product.variants.find(
-    (variant) => variant.size === selectedSize && variant.material === selectedMaterial,
-  );
+  const startingPrice = product.pricingTiers[0]?.unitPrice ?? 0;
 
   return (
     <div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-2">
@@ -29,50 +24,34 @@ const ProductDetails = () => {
 
       <div>
         <h1 className="text-2xl font-bold">{product.name}</h1>
+        <p className="mt-3 text-sm text-gray-500">
+          {product.capacity} {product.material ? `- ${product.material}` : ""} {product.color ? `- ${product.color}` : ""}
+        </p>
+        <p className="mt-2 text-sm text-gray-500">SKU: {product.sku}</p>
 
-        <div className="mt-4">
-          <h3 className="font-semibold">Select Size</h3>
-          <div className="mt-2 flex gap-3">
-            {sizes.map((size) => (
-              <button
-                key={size}
-                onClick={() => setSelectedSize(size)}
-                className={`rounded border px-4 py-2 ${selectedSize === size ? "bg-blue-600 text-white" : ""}`}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <h3 className="font-semibold">Select Material</h3>
-          <div className="mt-2 flex gap-3">
-            {materials.map((material) => (
-              <button
-                key={material}
-                onClick={() => setSelectedMaterial(material)}
-                className={`rounded border px-4 py-2 ${selectedMaterial === material ? "bg-blue-600 text-white" : ""}`}
-              >
-                {material}
-              </button>
-            ))}
-          </div>
+        <div className="mt-6 rounded-xl border border-gray-200 p-4">
+          <p className="text-xl font-bold text-blue-600">Starting at Rs. {startingPrice}</p>
+          <p className="mt-1 text-sm text-gray-500">Stock: {product.stockQuantity} {product.unit === "kg" ? "KG" : "GRAM"}</p>
         </div>
 
         <div className="mt-6">
-          <p className="text-xl font-bold text-blue-600">
-            {selectedVariant ? `Rs. ${selectedVariant.price}` : "Select options"}
-          </p>
-
-          {selectedVariant && <p className="text-sm text-gray-500">Stock: {selectedVariant.stock}</p>}
+          <h3 className="font-semibold">Pricing Tiers</h3>
+          <div className="mt-3 space-y-2">
+            {product.pricingTiers.map((tier) => (
+              <div key={`${tier.minQty}-${tier.maxQty}`} className="flex items-center justify-between rounded-lg border px-4 py-2 text-sm">
+                <span>
+                  {tier.minQty} to {tier.maxQty} units
+                </span>
+                <span className="font-semibold text-blue-600">Rs. {tier.unitPrice}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <button
-          disabled={!selectedVariant}
-          className="mt-6 w-full rounded-lg bg-blue-600 py-3 text-white disabled:bg-gray-400"
+          className="mt-6 w-full rounded-lg bg-blue-600 py-3 text-white"
         >
-          Add to Cart
+          Enquiry Now
         </button>
       </div>
     </div>

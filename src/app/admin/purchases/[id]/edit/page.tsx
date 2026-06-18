@@ -11,11 +11,16 @@ import {
   getPurchaseItemsByPurchaseId,
   updatePurchase,
 } from '@/lib/firestore';
+import { isPurchaseProductCategorySlug } from '@/lib/product-categories';
 import { useAuth } from '@/context/auth-context';
 import type { Product, Purchase, PurchaseItem, Supplier } from '@/types';
 import PurchaseForm from '@/components/admin/PurchaseForm';
 import { Spinner } from '@/components/ui';
 import toast from 'react-hot-toast';
+
+function isPurchaseProduct(product: Product) {
+  return isPurchaseProductCategorySlug(product.categoryId);
+}
 
 type PurchasePayload = Omit<Purchase, 'id' | 'createdAt' | 'updatedAt' | 'totalQty'> & {
   items: Array<Pick<PurchaseItem, 'productId' | 'quantity'>>;
@@ -48,7 +53,7 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
       setPurchase(purchaseData);
       setItems(itemData);
       setSuppliers(supplierData.filter((supplier) => supplier.status));
-      setProducts(productData.filter((product) => product.active));
+      setProducts(productData.filter((product) => product.active && isPurchaseProduct(product)));
       setLoading(false);
     });
   }, [id]);

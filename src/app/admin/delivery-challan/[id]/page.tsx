@@ -571,9 +571,9 @@ export default function DeliveryChallanDetailPage() {
                     </thead>
                     <tbody className="divide-y divide-stone-50">
                       {challan.products.map((product, index) => (
-                        <tr key={`${product.productId}-${product.variantId}-${index}`} className="hover:bg-stone-50 transition">
+                        <tr key={`${product.productId}-${index}`} className="hover:bg-stone-50 transition">
                           <td className="px-4 py-3 text-sm font-semibold text-stone-900">{product.productName}</td>
-                          <td className="px-4 py-3 text-sm text-stone-600">{product.variantLabel || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-stone-600">{product.productLabel || '-'}</td>
                           <td className="px-4 py-3 text-sm text-stone-600">{product.sku || '-'}</td>
                           <td className="px-4 py-3 text-sm text-stone-600">{product.quantity}</td>
                           <td className="px-4 py-3 text-sm text-stone-600">{formatPrice(product.price || 0)}</td>
@@ -973,10 +973,10 @@ export default function DeliveryChallanDetailPage() {
                   </tr>
                 ) : (
                   challan.products.map((product, index) => (
-                    <tr key={`${product.productId}-${product.variantId}-${index}`}>
+                    <tr key={`${product.productId}-${index}`}>
                       <td>{index + 1}</td>
                       <td>{product.productName}</td>
-                      <td>{[product.variantLabel, product.sku].filter(Boolean).join(' / ') || '-'}</td>
+                      <td>{[product.productLabel, product.sku].filter(Boolean).join(' / ') || '-'}</td>
                       <td>{product.quantity}</td>
                       <td>{formatPrice(product.price || 0)}</td>
                       <td>{formatPrice((product.price || 0) * product.quantity)}</td>

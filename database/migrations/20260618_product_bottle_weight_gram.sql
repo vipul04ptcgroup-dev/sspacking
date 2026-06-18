@@ -1,0 +1,22 @@
+-- Firestore is the source of truth for products in this repository.
+-- This migration records the schema change for the mirrored relational model
+-- and documents the application-level backfill introduced in lib/firestore.ts.
+--
+-- If a SQL `products` table exists in your deployment, apply:
+--   ALTER TABLE products ADD COLUMN bottle_weight_gram INT NULL;
+--   ALTER TABLE products
+--     ADD CONSTRAINT chk_products_bottle_weight_gram_positive
+--     CHECK (bottle_weight_gram IS NULL OR bottle_weight_gram > 0);
+--
+-- Production-only enforcement is implemented in the app/service layer because
+-- Firestore stores category as a document field rather than via relational FK constraints.
+--
+-- Existing Firestore production products are backfilled by `backfillProductStockFields()`
+-- using, in order:
+--   1. existing `bottle_weight_gram`
+--   2. numeric legacy `weight`
+--   3. numeric legacy `capacity`
+--   4. known product-name defaults:
+--      Rose Water Bottle -> 250
+--      Shampoo Bottle -> 500
+--      Oil Bottle -> 1000

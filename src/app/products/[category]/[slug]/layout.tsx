@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return buildMetadata({
     title: `${productName} | ${categoryName}`,
-    description: `View specifications, variants, and enquiry details for ${productName} in ${categoryName} by SS Packaging.`,
+    description: `View specifications, pricing tiers, and enquiry details for ${productName} in ${categoryName} by SS Packaging.`,
     path: `/products/${category}/${slug}`,
     keywords: [productName, categoryName, 'packaging product', 'SS Packaging'],
   });

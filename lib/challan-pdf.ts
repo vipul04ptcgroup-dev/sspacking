@@ -96,8 +96,8 @@ function extractCustomerTaxId(challan: DeliveryChallan): string {
   );
 }
 
-function getPerLabel(variantLabel?: string): string {
-  const normalized = variantLabel?.trim();
+function getPerLabel(productLabel?: string): string {
+  const normalized = productLabel?.trim();
   if (!normalized) return 'Pcs';
 
   const unitCandidate = normalized.match(/\b(pcs?|pieces?|box|boxes|set|sets|kg|g|ltr|litre|litres|ml)\b/i)?.[0];
@@ -184,10 +184,10 @@ export function mapDeliveryChallanToPdfData(challan: DeliveryChallan): ChallanPd
     signatureLabel: 'Authorized Signature',
     rows: challan.products.map((product, index) => ({
       srNo: String(index + 1),
-      item: [product.productName, product.variantLabel].filter(Boolean).join(' - ') || '-',
+      item: [product.productName, product.productLabel].filter(Boolean).join(' - ') || '-',
       qty: String(product.quantity || 0),
       rate: formatCurrency(product.price || 0),
-      per: getPerLabel(product.variantLabel),
+      per: getPerLabel(product.productLabel),
       amount: formatCurrency((product.price || 0) * (product.quantity || 0)),
     })),
   };

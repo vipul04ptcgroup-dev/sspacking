@@ -4,6 +4,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { extname, join, resolve } from 'node:path';
 import { access, readFile } from 'node:fs/promises';
+import { isProductionProductCategorySlug } from '@/lib/product-categories';
+import { getProductUnitForCategory } from '@/lib/product-units';
 import { slugify } from '@/lib/utils';
 
 export const runtime = 'nodejs';
@@ -24,6 +26,7 @@ type ImportProduct = {
   image?: string;
   images?: string[] | string;
   product_url?: string;
+  bottle_weight_gram?: string | number;
 };
 
 function asTrimmedString(value: unknown): string | undefined {
@@ -42,6 +45,17 @@ function parsePrice(value: string | number | undefined): number | undefined {
   if (typeof value === 'string') {
     const parsed = Number(value.trim());
     if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function parseBottleWeightGram(value: string | number | undefined): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.round(value);
+  if (typeof value === 'string') {
+    const match = value.trim().match(/(\d+(?:\.\d+)?)/);
+    if (!match) return undefined;
+    const parsed = Number(match[1]);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.round(parsed);
   }
   return undefined;
 }
@@ -297,13 +311,20 @@ export async function POST(request: Request) {
       }
 
       const category = asTrimmedString(raw.category) || 'uncategorized';
+      const unit = getProductUnitForCategory(category);
       const description = asTrimmedString(raw.description) || asTrimmedString(raw.shortDescription) || '';
       const slug = slugify(productName) || `product-${Date.now()}-${index + 1}`;
       const price = parsePrice(raw.price);
+      const bottleWeightGram = parseBottleWeightGram(raw.bottle_weight_gram);
       const imageSources = toImageSourceList(raw);
       const productUrl = asTrimmedString(raw.product_url);
       const sku = asTrimmedString(raw.sku) || '';
       const size = asTrimmedString(raw.size) || asTrimmedString(raw.capacity) || asTrimmedString(raw.variant_size) || '';
+
+      if (isProductionProductCategorySlug(category) && !bottleWeightGram) {
+        errors.push(`Row ${index + 1}: bottle_weight_gram is required for Production products and must be greater than 0.`);
+        continue;
+      }
 
       if (imageSources.length === 0 && productUrl) {
         try {
@@ -369,34 +390,37 @@ export async function POST(request: Request) {
       }
 
       try {
-        const variant: Record<string, unknown> = {
-          id: randomUUID(),
-          sku,
-          images: savedImages,
-        };
-        if (size) variant.capacity = size;
-        if (typeof price === 'number') variant.price = price;
-
         await adminDb.collection('products').add({
           name: productName,
           slug,
-          shortDescription: description || `${productName} - ${category}`,
+          categoryId: category,
           category,
+          shortDescription: description || `${productName} - ${category}`,
+          description,
           images: savedImages,
-          variants: [variant],
           tags: [],
+          sku,
+          unit,
+          capacity: size,
+          neckSize: '',
+          height: '',
+          weight: '',
+          material: '',
+          packagingSize: '',
+          color: '',
+          remark: '',
+          ...(bottleWeightGram ? { bottle_weight_gram: bottleWeightGram } : {}),
+          pricingTiers: typeof price === 'number' ? [{ minQty: 1, maxQty: 1, unitPrice: price }] : [],
           featured: false,
           active: true,
-          hasVariants: true,
           stockQuantity: 1,
           lowStockLimit: 1000,
           stockStatus: 'low_stock',
           lastStockUpdatedAt: FieldValue.serverTimestamp(),
           lastStockUpdatedBy: 'import',
-          sku,
-          price: price ?? null,
-          size,
           sourceImage: savedImages[0] || productUrl || '',
+          variants: [],
+          hasVariants: false,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });

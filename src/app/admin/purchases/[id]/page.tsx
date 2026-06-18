@@ -175,7 +175,7 @@ export default function ViewPurchasePage({ params }: { params: Promise<{ id: str
                         <p className="text-sm font-semibold text-stone-900">{product?.name || item.productId}</p>
                         <p className="text-xs text-stone-500">{item.productId}</p>
                       </td>
-                      <td className="px-5 py-4 text-sm text-stone-600">{product?.category || '-'}</td>
+                      <td className="px-5 py-4 text-sm text-stone-600">{product?.categoryId || '-'}</td>
                       <td className="px-5 py-4 text-sm font-semibold text-stone-900">{item.quantity}</td>
                     </tr>
                   );

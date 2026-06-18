@@ -9,6 +9,7 @@ import {
   getAllProducts,
   getInventoryTransactions,
 } from '@/lib/firestore';
+import { formatQuantityWithUnit, getProductUnitLabel } from '@/lib/product-units';
 import type { InventoryTransaction, Product } from '@/types';
 import { formatDate } from '@/lib/utils';
 import Button from '@/components/ui/Button';
@@ -36,11 +37,7 @@ function formatDateTime(date?: Date | null): string {
 }
 
 function getProductImage(product: Product): string {
-  return (
-    product.images?.[0] ||
-    product.variants.find((variant) => Array.isArray(variant.images) && variant.images[0])?.images?.[0] ||
-    ''
-  );
+  return product.images?.[0] || '';
 }
 
 export default function AdminInventoryPage() {
@@ -75,11 +72,10 @@ export default function AdminInventoryPage() {
     if (!term) return products;
 
     return products.filter((product) => {
-      const skuList = product.variants.map((variant) => variant.sku || '').join(' ');
       return (
         product.name.toLowerCase().includes(term) ||
-        product.category.toLowerCase().includes(term) ||
-        skuList.toLowerCase().includes(term)
+        product.categoryId.toLowerCase().includes(term) ||
+        product.sku.toLowerCase().includes(term)
       );
     });
   }, [products, search]);
@@ -87,6 +83,10 @@ export default function AdminInventoryPage() {
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) || null,
     [products, selectedProductId],
+  );
+  const productUnitsById = useMemo(
+    () => new Map(products.map((product) => [product.id, product.unit])),
+    [products],
   );
 
   const stats = useMemo(() => {
@@ -96,6 +96,9 @@ export default function AdminInventoryPage() {
       lowStock: products.filter((product) => product.stockStatus === 'low_stock').length,
     };
   }, [products]);
+
+  const resolveTransactionUnit = (transaction: InventoryTransaction) =>
+    transaction.unit || productUnitsById.get(transaction.productId) || 'gram';
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -200,7 +203,7 @@ export default function AdminInventoryPage() {
                 <option value="">Choose a product</option>
                 {filteredProducts.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.name} ({product.stockQuantity} in stock)
+                    {product.name} ({formatQuantityWithUnit(product.stockQuantity, product.unit)} in stock)
                   </option>
                 ))}
               </select>
@@ -220,7 +223,7 @@ export default function AdminInventoryPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-stone-900">{selectedProduct.name}</p>
-                    <p className="text-xs text-stone-500">{selectedProduct.category}</p>
+                    <p className="text-xs text-stone-500">{selectedProduct.categoryId}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <Badge
                         variant={
@@ -234,7 +237,7 @@ export default function AdminInventoryPage() {
                         {selectedProduct.stockStatus.replace('_', ' ')}
                       </Badge>
                       <span className="text-xs text-stone-500">
-                        Current stock: <span className="font-semibold text-stone-800">{selectedProduct.stockQuantity}</span>
+                        Current stock: <span className="font-semibold text-stone-800">{formatQuantityWithUnit(selectedProduct.stockQuantity, selectedProduct.unit)}</span>
                       </span>
                     </div>
                   </div>
@@ -245,7 +248,7 @@ export default function AdminInventoryPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 id="quantity"
-                label="Add Quantity"
+                label={`Add Quantity${selectedProduct ? ` (${getProductUnitLabel(selectedProduct.unit)})` : ''}`}
                 type="number"
                 min={1}
                 value={quantity}
@@ -255,7 +258,7 @@ export default function AdminInventoryPage() {
               <Input
                 id="currentStock"
                 label="Current Stock"
-                value={selectedProduct ? String(selectedProduct.stockQuantity) : '-'}
+                value={selectedProduct ? formatQuantityWithUnit(selectedProduct.stockQuantity, selectedProduct.unit) : '-'}
                 readOnly
                 className="bg-stone-50"
               />
@@ -317,19 +320,22 @@ export default function AdminInventoryPage() {
                   <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
                     <div>
                       <p className="text-stone-500">Quantity</p>
-                      <p className="font-semibold text-stone-900">{transaction.quantity}</p>
+                      <p className="font-semibold text-stone-900">{formatQuantityWithUnit(transaction.quantity, resolveTransactionUnit(transaction))}</p>
                     </div>
                     <div>
                       <p className="text-stone-500">Previous</p>
-                      <p className="font-semibold text-stone-900">{transaction.previousStock}</p>
+                      <p className="font-semibold text-stone-900">{formatQuantityWithUnit(transaction.previousStock, resolveTransactionUnit(transaction))}</p>
                     </div>
                     <div>
                       <p className="text-stone-500">New</p>
-                      <p className="font-semibold text-stone-900">{transaction.newStock}</p>
+                      <p className="font-semibold text-stone-900">{formatQuantityWithUnit(transaction.newStock, resolveTransactionUnit(transaction))}</p>
                     </div>
                   </div>
                   {transaction.note ? (
                     <p className="mt-3 text-xs text-stone-600">{transaction.note}</p>
+                  ) : null}
+                  {transaction.productionBatchId ? (
+                    <p className="mt-1 text-xs text-stone-500">Batch: {transaction.productionBatchId}</p>
                   ) : null}
                 </div>
               ))}
@@ -367,6 +373,7 @@ export default function AdminInventoryPage() {
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Product</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Current Stock</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Low Stock Limit</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Unit</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Stock Status</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Last Updated</th>
                 </tr>
@@ -387,12 +394,13 @@ export default function AdminInventoryPage() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-stone-900">{product.name}</p>
-                          <p className="text-xs text-stone-500">{product.category}</p>
+                          <p className="text-xs text-stone-500">{product.categoryId}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-sm font-semibold text-stone-900">{product.stockQuantity}</td>
-                    <td className="px-5 py-4 text-sm text-stone-600">{product.lowStockLimit}</td>
+                    <td className="px-5 py-4 text-sm font-semibold text-stone-900">{formatQuantityWithUnit(product.stockQuantity, product.unit)}</td>
+                    <td className="px-5 py-4 text-sm text-stone-600">{formatQuantityWithUnit(product.lowStockLimit, product.unit)}</td>
+                    <td className="px-5 py-4 text-sm text-stone-600">{getProductUnitLabel(product.unit)}</td>
                     <td className="px-5 py-4">
                       <Badge
                         variant={
@@ -442,6 +450,7 @@ export default function AdminInventoryPage() {
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Product</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Type</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Source</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Batch</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Quantity</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">Previous</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500">New</th>
@@ -465,9 +474,10 @@ export default function AdminInventoryPage() {
                       </Badge>
                     </td>
                     <td className="px-5 py-4 text-sm text-stone-600">{transaction.source.replace(/_/g, ' ')}</td>
-                    <td className="px-5 py-4 text-sm font-semibold text-stone-900">{transaction.quantity}</td>
-                    <td className="px-5 py-4 text-sm text-stone-600">{transaction.previousStock}</td>
-                    <td className="px-5 py-4 text-sm font-semibold text-stone-900">{transaction.newStock}</td>
+                    <td className="px-5 py-4 text-sm text-stone-600">{transaction.productionBatchId || '-'}</td>
+                    <td className="px-5 py-4 text-sm font-semibold text-stone-900">{formatQuantityWithUnit(transaction.quantity, resolveTransactionUnit(transaction))}</td>
+                    <td className="px-5 py-4 text-sm text-stone-600">{formatQuantityWithUnit(transaction.previousStock, resolveTransactionUnit(transaction))}</td>
+                    <td className="px-5 py-4 text-sm font-semibold text-stone-900">{formatQuantityWithUnit(transaction.newStock, resolveTransactionUnit(transaction))}</td>
                     <td className="px-5 py-4 text-sm text-stone-600">{transaction.createdBy || '-'}</td>
                     <td className="px-5 py-4 text-sm text-stone-600">{transaction.note || '-'}</td>
                   </tr>

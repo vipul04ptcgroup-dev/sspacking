@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       displayName: name,
       role: 'customer',
+      customerType: 'website',
       addresses: [],
     });
   };
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: googleUser.email ?? '',
         displayName: googleUser.displayName ?? '',
         role: 'customer',
+        customerType: 'website',
         addresses: [],
       });
     }

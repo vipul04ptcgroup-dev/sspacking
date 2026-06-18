@@ -1,20 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAllCategories, createCategory, updateCategory, deleteCategory } from '@/lib/firestore';
+import { getAllCategories, updateCategory } from '@/lib/firestore';
 import { useAuth } from '@/context/auth-context';
 import { uploadCategoryImage } from '@/lib/storage';
 import type { Category } from '@/types';
-import { slugify } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { Textarea, Modal, EmptyState } from '@/components/ui';
 import { Spinner } from '@/components/ui';
-import { Plus, Pencil, Trash2, Tags, Upload, X } from 'lucide-react';
+import { Pencil, Tags, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
-
-const emptyForm = { name: '', slug: '', description: '', image: '', order: 0, active: true };
 
 export default function AdminCategoriesPage() {
   const { user } = useAuth();
@@ -22,43 +19,30 @@ export default function AdminCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({ name: '', slug: '', description: '', image: '', order: 0, active: true });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const load = async () => { setCategories(await getAllCategories()); setLoading(false); };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setModalOpen(true); };
   const openEdit = (cat: Category) => { setEditing(cat); setForm({ name: cat.name, slug: cat.slug, description: cat.description, image: cat.image || '', order: cat.order, active: cat.active }); setModalOpen(true); };
 
-  const handleNameChange = (name: string) => {
-    setForm(f => ({ ...f, name, slug: editing ? f.slug : slugify(name) }));
-  };
-
   const handleSave = async () => {
+    if (!editing) {
+      toast.error('Only the core categories can be managed here.');
+      return;
+    }
     if (!form.name) { toast.error('Name is required'); return; }
     if (uploading) { toast.error('Please wait for the image upload to finish'); return; }
     setSaving(true);
     try {
-      if (editing) {
-        await updateCategory(editing.id, form, user?.email || user?.uid || 'admin');
-        toast.success('Category updated!');
-      } else {
-        await createCategory(form as Omit<Category, 'id'>, user?.email || user?.uid || 'admin');
-        toast.success('Category created!');
-      }
+      await updateCategory(editing.id, form, user?.email || user?.uid || 'admin');
+      toast.success('Category updated!');
       setModalOpen(false);
       load();
     } catch { toast.error('Save failed'); }
     finally { setSaving(false); }
-  };
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete category "${name}"?`)) return;
-    await deleteCategory(id, user?.email || user?.uid || 'admin');
-    toast.success('Category deleted');
-    load();
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,15 +68,18 @@ export default function AdminCategoriesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-stone-900">Categories</h1>
-          <p className="text-stone-500 mt-1">{categories.length} categories</p>
+          <p className="text-stone-500 mt-1">Only Raw Material, Production, and Finished categories are supported.</p>
         </div>
-        <Button onClick={openNew}><Plus className="w-4 h-4" /> Add Category</Button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><Spinner /></div>
       ) : categories.length === 0 ? (
-        <EmptyState icon={<Tags className="w-16 h-16" />} title="No categories yet" action={<Button onClick={openNew}>Create First Category</Button>} />
+        <EmptyState
+          icon={<Tags className="w-16 h-16" />}
+          title="No managed categories found"
+          description="Run the category migration to seed Raw Material, Production, and Finished categories."
+        />
       ) : (
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
           <table className="w-full">
@@ -121,9 +108,6 @@ export default function AdminCategoriesPage() {
                       <button onClick={() => openEdit(cat)} className="p-2 text-stone-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition">
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(cat.id, cat.name)} className="p-2 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -133,10 +117,10 @@ export default function AdminCategoriesPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Category' : 'New Category'}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Edit Category">
         <div className="space-y-4">
-          <Input label="Category Name *" id="cat-name" value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Bamboo Packaging" />
-          <Input label="Slug" id="cat-slug" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="auto-generated" />
+          <Input label="Category Name *" id="cat-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Raw Material" />
+          <Input label="Slug" id="cat-slug" value={form.slug} readOnly disabled placeholder="core category slug" />
           <Textarea label="Description" id="cat-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief category description" />
           <div className="space-y-3">
             <div>
@@ -177,9 +161,7 @@ export default function AdminCategoriesPage() {
             <span className="text-sm font-medium text-stone-700">Active (Visible on store)</span>
           </label>
           <div className="flex gap-3 pt-2">
-            <Button onClick={handleSave} loading={saving || uploading} className="flex-1">
-              {editing ? 'Update' : 'Create'}
-            </Button>
+            <Button onClick={handleSave} loading={saving || uploading} className="flex-1">Update</Button>
             <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
           </div>
         </div>

@@ -460,9 +460,9 @@ export default function DeliveryChallanForm() {
                 </thead>
                 <tbody className="divide-y divide-stone-50">
                   {products.map((product, index) => (
-                    <tr key={`${product.productId}-${product.variantId}-${index}`} className="hover:bg-stone-50 transition">
+                    <tr key={`${product.productId}-${index}`} className="hover:bg-stone-50 transition">
                       <td className="px-4 py-3 text-sm font-semibold text-stone-900">{product.productName}</td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{product.variantLabel || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{product.productLabel || '-'}</td>
                       <td className="px-4 py-3 text-sm text-stone-600">{product.sku || '-'}</td>
                       <td className="px-4 py-3">
                         <input

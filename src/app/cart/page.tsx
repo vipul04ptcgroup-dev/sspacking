@@ -32,7 +32,7 @@ export default function CartPage() {
       if (!mounted) return;
 
       const nextMap = issues.reduce<Record<string, string>>((acc, issue) => {
-        acc[`${issue.productId}-${issue.variantId}`] =
+        acc[issue.productId] =
           issue.reason === 'insufficient_stock'
             ? 'In stock'
             : 'Out of stock';
@@ -71,7 +71,7 @@ export default function CartPage() {
       <div className="grid lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-4">
           {items.map(item => (
-            <div key={`${item.productId}-${item.variantId}`} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 flex gap-4">
+            <div key={item.productId} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 flex gap-4">
               <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-stone-50 shrink-0">
                 {item.productImage ? (
                   <Image src={item.productImage} alt={item.productName} fill className="object-cover" />
@@ -82,27 +82,27 @@ export default function CartPage() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <Link href={`/products/${item.category}/${item.slug}`} className="font-bold text-stone-900 hover:text-amber-700 text-sm leading-snug line-clamp-2">
+                <Link href={`/products/${item.categoryId}/${item.slug}`} className="font-bold text-stone-900 hover:text-amber-700 text-sm leading-snug line-clamp-2">
                   {item.productName}
                 </Link>
-                <p className="text-xs text-stone-500 mt-0.5">{item.variantLabel}</p>
-                {stockIssueMap[`${item.productId}-${item.variantId}`] ? (
-                  <p className="mt-1 text-xs font-semibold text-red-600">{stockIssueMap[`${item.productId}-${item.variantId}`]}</p>
+                {item.productLabel ? <p className="text-xs text-stone-500 mt-0.5">{item.productLabel}</p> : null}
+                {stockIssueMap[item.productId] ? (
+                  <p className="mt-1 text-xs font-semibold text-red-600">{stockIssueMap[item.productId]}</p>
                 ) : null}
                 <p className="text-base font-black text-stone-900 mt-1">{formatPrice(item.price)}</p>
                 <div className="flex items-center justify-between mt-3">
                   <div className="flex items-center border border-stone-200 rounded-lg overflow-hidden">
-                    <button onClick={() => updateQuantity(item.productId, item.variantId, item.quantity - 1)} className="px-3 py-1.5 hover:bg-stone-100 transition text-stone-600">
+                    <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="px-3 py-1.5 hover:bg-stone-100 transition text-stone-600">
                       <Minus className="w-3.5 h-3.5" />
                     </button>
                     <span className="px-4 py-1.5 text-sm font-bold">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.productId, item.variantId, item.quantity + 1)} className="px-3 py-1.5 hover:bg-stone-100 transition text-stone-600">
+                    <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="px-3 py-1.5 hover:bg-stone-100 transition text-stone-600">
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-stone-900">{formatPrice(item.price * item.quantity)}</span>
-                    <button onClick={() => removeItem(item.productId, item.variantId)} className="text-red-400 hover:text-red-600 transition">
+                    <button onClick={() => removeItem(item.productId)} className="text-red-400 hover:text-red-600 transition">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
