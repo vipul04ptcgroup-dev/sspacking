@@ -1,6 +1,5 @@
 import { getCategories, getProducts } from '@/lib/firestore';
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sspackaging.in';
+import { SITE_URL } from '@/lib/seo';
 
 export type SitemapEntry = {
   url: string;
@@ -25,7 +24,7 @@ const publicStaticRoutes: Array<Omit<SitemapEntry, 'url' | 'lastModified'>> = [
 ];
 
 function toAbsolute(path: string): string {
-  return path === '/' ? siteUrl : `${siteUrl}${path}`;
+  return path === '/' ? SITE_URL : `${SITE_URL}${path}`;
 }
 
 function safeSegment(value: string): string {

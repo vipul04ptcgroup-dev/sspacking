@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/src/seo/organizationSchema';
 
-export const SITE_NAME = 'SS Packaging';
-export const SITE_DESCRIPTION =
-  "India's trusted source for bamboo, glass, plastic, and eco-friendly packaging products.";
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://sspackaging.in';
+export { SITE_NAME, SITE_DESCRIPTION, SITE_URL };
 
 function trimSlash(path: string): string {
   if (!path) return '/';

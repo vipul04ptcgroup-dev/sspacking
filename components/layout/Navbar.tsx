@@ -46,25 +46,29 @@ export default function Navbar() {
   return (
     <header className={`sticky top-0 z-40 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-md' : 'bg-white/95 backdrop-blur-sm border-b border-stone-100'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16 lg:h-20">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center h-14 sm:h-16 lg:h-20 gap-3 lg:grid-cols-3">
 
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
+          {/* Left navigation on desktop, menu toggle on mobile */}
+          <div className="flex items-center justify-start min-w-0">
+            <nav className="hidden lg:flex items-center gap-1">
+              <Link href="/" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">Home</Link>
+              <Link href="/products" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">Products</Link>
+              <Link href="/about" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">About</Link>
+              <Link href="/contact" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">Contact</Link>
+            </nav>
+
+            <button onClick={() => setMenuOpen(v => !v)} className="lg:hidden p-1.5 sm:p-2 text-stone-600 hover:bg-stone-100 rounded-lg">
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+
+          {/* Centered logo */}
+          <Link href="/" className="flex items-center justify-center gap-2 shrink-0 min-w-0">
             <Image src="/Logo.png" alt="SS Packaging logo" width={40} height={40} className="w-auto h-10 sm:h-12 lg:h-16 object-contain" priority />
-           
           </Link>
 
-          {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            <Link href="/" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">Home</Link>
-            <Link href="/products" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">Products</Link>
-
-            <Link href="/about" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">About</Link>
-            <Link href="/contact" className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition">Contact</Link>
-          </nav>
-
           {/* Search + Actions */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center justify-end gap-1 sm:gap-2 min-w-0">
             {/* Search */}
             <form onSubmit={handleSearch} className="hidden md:flex items-center">
               <div className="relative">
@@ -144,11 +148,6 @@ export default function Navbar() {
             <Link href="/contact#quote" className="hidden lg:flex px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold rounded-lg transition">
               Get Quote
             </Link>
-
-            {/* Mobile menu toggle */}
-            <button onClick={() => setMenuOpen(v => !v)} className="lg:hidden p-1.5 sm:p-2 text-stone-600 hover:bg-stone-100 rounded-lg">
-              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
 

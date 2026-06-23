@@ -26,16 +26,16 @@ export default function AccountPage() {
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login?redirect=/account');
     if (!loading && user && isTeamMember) router.push('/team');
-  }, [user, loading, router, isTeamMember]);
+    }, [user, loading, router, isTeamMember]);
 
-  useEffect(() => {
-    if (!user) return;
-    setDisplayName(userProfile?.displayName || user.displayName || '');
-    setPhone(userProfile?.phone || '');
-  }, [user, userProfile]);
+    useEffect(() => {
+      if (!user) return;
+      setDisplayName(userProfile?.displayName || user.displayName || '');
+      setPhone(userProfile?.phone || '');
+    }, [user, userProfile]);
 
-  useEffect(() => {
-    if (!user) return;
+    useEffect(() => {
+      if (!user) return;
     setOrdersLoading(true);
     getUserOrders(user.uid)
       .then(setOrders)

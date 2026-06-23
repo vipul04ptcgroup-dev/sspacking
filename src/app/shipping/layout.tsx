@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { buildMetadata } from '@/lib/seo';
+import { buildWebPageSchema } from '@/src/seo/webpageSchema';
+import { SchemaInjector } from '@/src/seo/schemaInjector';
 
 export const metadata: Metadata = buildMetadata({
   title: 'Shipping Policy',
@@ -9,5 +11,20 @@ export const metadata: Metadata = buildMetadata({
 });
 
 export default function ShippingLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <>
+      {/* WebPage schema for the shipping policy page. */}
+      <SchemaInjector
+        schemas={[
+          buildWebPageSchema({
+            path: '/shipping',
+            name: 'Shipping Policy',
+            description: 'Review SS Packaging shipping timelines, delivery coverage, charges, and shipment support details.',
+            keywords: ['shipping policy', 'delivery policy', 'SS Packaging shipping'],
+          }),
+        ]}
+      />
+      {children}
+    </>
+  );
 }

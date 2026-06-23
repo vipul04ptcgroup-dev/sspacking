@@ -5,36 +5,21 @@ import { Toaster } from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import ScrollToTop from '@/components/layout/ScrollToTop';
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sspackaging.in';
-
-const siteNavigation = {
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'SS Packaging',
-  url: siteUrl,
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: `${siteUrl}/products?q={search_term_string}`,
-    'query-input': 'required name=search_term_string',
-  },
-  hasPart: [
-    { '@type': 'SiteNavigationElement', name: 'Home', url: `${siteUrl}/` },
-    { '@type': 'SiteNavigationElement', name: 'Products', url: `${siteUrl}/products` },
-    { '@type': 'SiteNavigationElement', name: 'About', url: `${siteUrl}/about` },
-    { '@type': 'SiteNavigationElement', name: 'Contact', url: `${siteUrl}/contact` },
-  ],
-};
+import { SITE_URL } from '@/lib/seo';
+import { buildOrganizationSchema } from '@/src/seo/organizationSchema';
+import { buildWebsiteSchema } from '@/src/seo/websiteSchema';
+import { buildLocalBusinessSchema } from '@/src/seo/localBusinessSchema';
+import { SchemaInjector } from '@/src/seo/schemaInjector';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: { default: 'SS Packaging', template: '%s | SS Packaging' },
   description: "India's trusted source for bamboo, glass, plastic, and eco-friendly packaging products.",
   openGraph: {
     title: 'SS Packaging',
     description: "India's trusted source for bamboo, glass, plastic, and eco-friendly packaging products.",
     type: 'website',
-    url: siteUrl,
+    url: SITE_URL,
     siteName: 'SS Packaging',
   },
   icons: {
@@ -48,9 +33,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body className="bg-stone-50 text-stone-900 antialiased font-sans">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteNavigation) }}
+        {/* Global structured data used site-wide for entity recognition and sitelink search support. */}
+        <SchemaInjector
+          schemas={[
+            buildOrganizationSchema(),
+            buildWebsiteSchema(),
+            buildLocalBusinessSchema(),
+          ]}
         />
         <AuthProvider>
           <ScrollToTop />
