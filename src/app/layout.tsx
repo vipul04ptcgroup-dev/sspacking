@@ -6,7 +6,7 @@ import Navbar from '@/components/layout/Navbar';
 import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import ScrollToTop from '@/components/layout/ScrollToTop';
 import { SITE_URL } from '@/lib/seo';
-import { buildOrganizationSchema } from '@/src/seo/organizationSchema';
+import { BUSINESS_IMAGES, buildOrganizationSchema } from '@/src/seo/organizationSchema';
 import { buildWebsiteSchema } from '@/src/seo/websiteSchema';
 import { buildLocalBusinessSchema } from '@/src/seo/localBusinessSchema';
 import { SchemaInjector } from '@/src/seo/schemaInjector';
@@ -21,6 +21,13 @@ export const metadata: Metadata = {
     type: 'website',
     url: SITE_URL,
     siteName: 'SS Packaging',
+    images: BUSINESS_IMAGES.map((url: string) => ({ url })),
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SS Packaging',
+    description: "India's trusted source for bamboo, glass, plastic, and eco-friendly packaging products.",
+    images: BUSINESS_IMAGES,
   },
   icons: {
     icon: [{ url: '/favicon.png', type: 'image/png' }],

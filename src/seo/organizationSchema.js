@@ -4,6 +4,8 @@ export const SITE_NAME = 'SS Packaging';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || FALLBACK_SITE_URL).replace(/\/$/, '');
 export const SITE_DESCRIPTION =
   'SS Packaging is a manufacturer and supplier of glass bottles, amber glass bottles, clear glass bottles, cosmetic packaging bottles, serum bottles, lotion bottles, acrylic bottles, pharmaceutical bottles, jars, dropper bottles and packaging solutions in India.';
+export const SITE_LOGO_PATH = '/Logo.png';
+export const SITE_BANNER_PATH = '/banner.png';
 
 export const SITE_KEYWORDS = [
   'Glass Bottle Manufacturer',
@@ -29,7 +31,7 @@ export const BUSINESS_DETAILS = {
   factoryAddress:
     'Unit no. 13, Pragati Compound, Dongri Pada Road, near Jain Mandir, Poman, Vasai Bhiwandi Road, Vasai East, Palghar - 401208',
   areaServed: 'IN',
-  priceRange: '$$',
+  priceRange: '₹₹',
 };
 
 export function buildAbsoluteUrl(path = '/') {
@@ -71,6 +73,9 @@ export function normalizeImages(images = []) {
   );
 }
 
+export const BUSINESS_IMAGES = normalizeImages([SITE_LOGO_PATH, SITE_BANNER_PATH]);
+export const BUSINESS_LOGO_URL = buildAbsoluteUrl(SITE_LOGO_PATH);
+
 export function buildOrganizationSchema() {
   return {
     '@context': 'https://schema.org',
@@ -79,10 +84,23 @@ export function buildOrganizationSchema() {
     name: SITE_NAME,
     url: SITE_URL,
     description: SITE_DESCRIPTION,
+    image: BUSINESS_IMAGES,
+    logo: {
+      '@type': 'ImageObject',
+      url: BUSINESS_LOGO_URL,
+    },
     email: BUSINESS_DETAILS.email,
     telephone: BUSINESS_DETAILS.phone,
     areaServed: BUSINESS_DETAILS.areaServed,
     keywords: SITE_KEYWORDS.join(', '),
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: BUSINESS_DETAILS.officeAddress,
+      addressLocality: 'Virar',
+      addressRegion: 'Maharashtra',
+      postalCode: '401303',
+      addressCountry: 'IN',
+    },
     contactPoint: [
       {
         '@type': 'ContactPoint',

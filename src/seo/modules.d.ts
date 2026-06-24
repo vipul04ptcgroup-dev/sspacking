@@ -13,7 +13,11 @@ declare module '@/src/seo/organizationSchema' {
   export const SITE_NAME: string;
   export const SITE_URL: string;
   export const SITE_DESCRIPTION: string;
+  export const SITE_LOGO_PATH: string;
+  export const SITE_BANNER_PATH: string;
   export const SITE_KEYWORDS: string[];
+  export const BUSINESS_IMAGES: string[];
+  export const BUSINESS_LOGO_URL: string;
   export const BUSINESS_DETAILS: {
     phone: string;
     email: string;

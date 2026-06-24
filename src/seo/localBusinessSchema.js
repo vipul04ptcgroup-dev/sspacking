@@ -1,4 +1,5 @@
 import {
+  BUSINESS_IMAGES,
   BUSINESS_DETAILS,
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -14,7 +15,7 @@ export function buildLocalBusinessSchema() {
     name: SITE_NAME,
     description: SITE_DESCRIPTION,
     url: SITE_URL,
-    image: [],
+    image: BUSINESS_IMAGES,
     email: BUSINESS_DETAILS.email,
     telephone: BUSINESS_DETAILS.phone,
     priceRange: BUSINESS_DETAILS.priceRange,
