@@ -25,6 +25,11 @@ declare module '@/src/seo/organizationSchema' {
     factoryAddress: string;
     areaServed: string;
     priceRange: string;
+    openingHours: {
+      days: string[];
+      opens: string;
+      closes: string;
+    };
   };
   export function buildAbsoluteUrl(path?: string): string;
   export function buildSchemaId(path: string, suffix: string): string;

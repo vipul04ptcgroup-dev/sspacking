@@ -32,6 +32,11 @@ export const BUSINESS_DETAILS = {
     'Unit no. 13, Pragati Compound, Dongri Pada Road, near Jain Mandir, Poman, Vasai Bhiwandi Road, Vasai East, Palghar - 401208',
   areaServed: 'IN',
   priceRange: '₹₹',
+  openingHours: {
+    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    opens: '09:00',
+    closes: '18:00',
+  },
 };
 
 export function buildAbsoluteUrl(path = '/') {

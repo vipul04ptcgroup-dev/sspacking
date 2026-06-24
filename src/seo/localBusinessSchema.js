@@ -19,6 +19,13 @@ export function buildLocalBusinessSchema() {
     email: BUSINESS_DETAILS.email,
     telephone: BUSINESS_DETAILS.phone,
     priceRange: BUSINESS_DETAILS.priceRange,
+    currenciesAccepted: 'INR',
+    openingHoursSpecification: {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: BUSINESS_DETAILS.openingHours.days,
+      opens: BUSINESS_DETAILS.openingHours.opens,
+      closes: BUSINESS_DETAILS.openingHours.closes,
+    },
     address: {
       '@type': 'PostalAddress',
       streetAddress: BUSINESS_DETAILS.officeAddress,
