@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import type { Product, Category } from '@/types';
+import type { ClientCategory, ClientProduct } from '@/lib/client-serialization';
 import { SlidersHorizontal, X } from 'lucide-react';
 
 const ProductGrid = dynamic(() => import('@/components/product/ProductGrid'), {
@@ -32,16 +32,16 @@ function ProductsContent({
   initialProducts,
   initialCategories,
 }: {
-  initialProducts: Product[];
-  initialCategories: Category[];
+  initialProducts: ClientProduct[];
+  initialCategories: ClientCategory[];
 }) {
   const INITIAL_PRODUCTS_TO_SHOW = 12;
   const PRODUCTS_BATCH_SIZE = 16;
   const LOAD_MORE_DELAY_MS = 120;
   const searchParams = useSearchParams();
   const q = searchParams?.get('q') || '';
-  const [products] = useState<Product[]>(initialProducts);
-  const [categories] = useState<Category[]>(initialCategories);
+  const [products] = useState<ClientProduct[]>(initialProducts);
+  const [categories] = useState<ClientCategory[]>(initialCategories);
   const [loading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [sortBy, setSortBy] = useState('default');
@@ -192,8 +192,8 @@ function ProductsContent({
 }
 
 export default function ProductsPageClient(props: {
-  initialProducts: Product[];
-  initialCategories: Category[];
+  initialProducts: ClientProduct[];
+  initialCategories: ClientCategory[];
 }) {
   return (
     <Suspense fallback={<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10" />}>

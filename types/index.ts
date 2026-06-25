@@ -24,6 +24,8 @@ export interface Product {
   name: string;
   slug: string;
   categoryId: string;
+  publicCategoryName: string;
+  publicCategorySlug: string;
   shortDescription: string;
   description: string;
   images: string[];

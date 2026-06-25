@@ -13,6 +13,8 @@ import Button from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { Phone, Mail, MapPin, Clock, CheckCircle } from 'lucide-react';
 
+const MAIN_CONTACT_EMAIL = 'customerservice.sspackaging@gmail.com';
+
 const schema = z.object({
   name: z.string().min(2, 'Name required'),
   email: z.string().email('Valid email required'),
@@ -20,7 +22,7 @@ const schema = z.object({
   company: z.string().optional(),
   productInterest: z.string().min(2, 'Please describe the product'),
   quantity: z.string().min(1, 'Quantity required'),
-  message: z.string().default(''),
+  message: z.string().min(5, 'Message required'),
 });
 
 type FormInput = z.input<typeof schema>;
@@ -48,6 +50,7 @@ function ContactPageFallback() {
 function ContactPageContent() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const searchParams = useSearchParams();
   const getSearchParam = (key: string) => searchParams?.get(key)?.trim() || '';
 
@@ -66,31 +69,10 @@ function ContactPageContent() {
   }, [searchParams, setValue]);
 
   const sendQuoteEmail = async (data: FormOutput, productUrl: string) => {
-    try {
-      await fetch('/api/quote-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          company: data.company,
-          productInterest: data.productInterest,
-          productUrl,
-          quantity: data.quantity,
-          message: data.message ?? '',
-        }),
-      });
-    } catch {
-      // Intentionally ignore email errors to avoid disturbing quote submission flow.
-    }
-  };
-
-  const onSubmit: SubmitHandler<FormOutput> = async (data) => {
-    setLoading(true);
-    try {
-      const productUrl = getSearchParam('productUrl');
-      await createQuoteRequest({
+    const response = await fetch('/api/quote-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: data.name,
         email: data.email,
         phone: data.phone,
@@ -98,12 +80,69 @@ function ContactPageContent() {
         productInterest: data.productInterest,
         productUrl,
         quantity: data.quantity,
-        message: data.message ?? '',
-      });
+        message: data.message,
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || result?.ok === false) {
+      throw new Error(
+        typeof result?.error === 'string' && result.error.trim()
+          ? result.error
+          : 'We could not send your request right now. Please try again in a moment.',
+      );
+    }
+
+    return result;
+  };
+
+  const onSubmit: SubmitHandler<FormOutput> = async (data) => {
+    if (loading || submitted) return;
+
+    setLoading(true);
+    setSubmitError('');
+
+    try {
+      const productUrl = getSearchParam('productUrl');
+
+      await sendQuoteEmail(data, productUrl);
+
+      try {
+        await createQuoteRequest({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          company: data.company,
+          productInterest: data.productInterest,
+          productUrl,
+          quantity: data.quantity,
+          message: data.message,
+        });
+      } catch {
+        // The inquiry was already delivered through the backend contact API.
+      }
+
       setSubmitted(true);
-      reset({ productInterest: '' });
-      void sendQuoteEmail(data, productUrl);
-    } catch { toast.error('Failed to send request. Please try again.'); }
+      reset({
+        name: '',
+        email: '',
+        phone: '',
+        company: '',
+        productInterest: '',
+        quantity: '',
+        message: '',
+      });
+      toast.success('Thanks for reaching out. Your request has been sent successfully.');
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : 'We could not submit your request. Please try again.';
+
+      setSubmitError(message);
+      toast.error(message);
+    }
     finally { setLoading(false); }
   };
 
@@ -122,7 +161,7 @@ function ContactPageContent() {
             <h2 className="text-lg sm:text-xl font-black text-stone-900 mb-5 sm:mb-6">Contact Information</h2>
             {[
               { icon: Phone, label: 'Phone', value: '+91 91208 79879', href: 'tel:+919876543210' },
-              { icon: Mail, label: 'Email', value: 'ptcvirar@gmail.com', href: 'mailto:ptcvirar@gmail.com' },
+              { icon: Mail, label: 'Customer Service Email', value: MAIN_CONTACT_EMAIL, href: `mailto:${MAIN_CONTACT_EMAIL}` },
               { icon: MapPin, label: 'Office Address', value: 'Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra, India.' },
               { icon: MapPin, label: 'Factory Address', value: 'Unit no. 13, Pragati Compound, Dongri Pada Road, near Jain Mandir, Poman, Vasai Bhiwandi Road, Vasai East, Palghar - 401208' },
               { icon: Clock, label: 'Hours', value: 'Mon – Sat: 9:00 AM – 6:00 PM' },
@@ -164,6 +203,14 @@ function ContactPageContent() {
             ) : (
               <>
                 <h2 className="text-xl sm:text-2xl font-black text-stone-900 mb-5 sm:mb-6">Request a Quote</h2>
+                {submitError ? (
+                  <div
+                    role="alert"
+                    className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                  >
+                    {submitError}
+                  </div>
+                ) : null}
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid sm:grid-cols-2 gap-4">
                     <Input label="Full Name *" id="name" placeholder="John Doe" error={errors.name?.message} {...register('name')} />
@@ -173,8 +220,8 @@ function ContactPageContent() {
                     <Input label="Product Interest *" id="productInterest" placeholder="e.g. Bamboo Bottles, Glass Jars" error={errors.productInterest?.message} {...register('productInterest')} className="sm:col-span-2" />
                     <Input label="Required Quantity *" id="quantity" placeholder="e.g. 500 units" error={errors.quantity?.message} {...register('quantity')} />
                   </div>
-                  <Textarea label="Additional Message" id="message" placeholder="Any specific requirements, customization needs, or questions..." {...register('message')} />
-                  <Button type="submit" loading={loading} size="lg" className="w-full">
+                  <Textarea label="Additional Message *" id="message" placeholder="Any specific requirements, customization needs, or questions..." error={errors.message?.message} {...register('message')} />
+                  <Button type="submit" loading={loading} disabled={loading || submitted} size="lg" className="w-full">
                     Send Quote Request
                   </Button>
                 </form>

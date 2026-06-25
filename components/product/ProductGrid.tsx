@@ -1,10 +1,10 @@
 import ProductCard from './ProductCard';
-import type { Product } from '@/types';
+import type { ClientProduct } from '@/lib/client-serialization';
 import { EmptyState } from '@/components/ui';
 import { Package } from 'lucide-react';
 
 interface ProductGridProps {
-  products: Product[];
+  products: ClientProduct[];
   loading?: boolean;
 }
 

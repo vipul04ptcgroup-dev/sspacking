@@ -6,7 +6,8 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getAllCategories } from '@/lib/firestore';
-import { isProductionProductCategorySlug } from '@/lib/product-categories';
+import { CORE_PRODUCT_CATEGORIES, isProductionProductCategorySlug } from '@/lib/product-categories';
+import { normalizePublicCategorySlug } from '@/lib/public-product-categories';
 import { getProductUnitForCategory, getProductUnitLabel } from '@/lib/product-units';
 import { uploadProductImage } from '@/lib/storage';
 import { slugify } from '@/lib/utils';
@@ -28,6 +29,8 @@ const schema = z.object({
   name: z.string().min(2, 'Name required'),
   slug: z.string().min(2, 'Slug required'),
   categoryId: z.string().min(1, 'Category required'),
+  publicCategoryName: z.string().min(1, 'Public category required'),
+  publicCategorySlug: z.string().min(1, 'Public category slug required'),
   shortDescription: z.string().min(5, 'Short description required'),
   description: z.string().trim().min(1, 'Product description required'),
   images: z.string().optional(),
@@ -107,12 +110,12 @@ const newPricingTier = () => ({
 
 export default function ProductForm({ initialData, onSubmit }: ProductFormProps) {
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [publicCategories, setPublicCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
 
   useEffect(() => {
-    getAllCategories().then(setCategories);
+    getAllCategories().then(setPublicCategories);
   }, []);
 
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues, unknown, FormSubmitValues>({
@@ -122,6 +125,8 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
           ...initialData,
           images: (initialData.images || []).join(', '),
           tags: initialData.tags.join(', '),
+          publicCategoryName: initialData.publicCategoryName || initialData.categoryId,
+          publicCategorySlug: initialData.publicCategorySlug || normalizePublicCategorySlug(initialData.publicCategoryName || initialData.categoryId),
           description: initialData.description || '',
           unit: initialData.unit || getProductUnitForCategory(initialData.categoryId),
           pricingTiers: initialData.pricingTiers.length > 0
@@ -136,6 +141,8 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
           name: '',
           slug: '',
           categoryId: '',
+          publicCategoryName: '',
+          publicCategorySlug: '',
           shortDescription: '',
           description: '',
           images: '',
@@ -169,6 +176,7 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
   const imagesValue = watch('images');
   const pricingTiersValue = watch('pricingTiers');
   const selectedCategoryId = watch('categoryId');
+  const publicCategoryNameValue = watch('publicCategoryName');
   const isProductionCategory = isProductionProductCategorySlug(selectedCategoryId || initialData?.categoryId || 'finished');
   const derivedUnit = getProductUnitForCategory(selectedCategoryId || initialData?.categoryId || 'finished');
   const derivedUnitLabel = getProductUnitLabel(derivedUnit);
@@ -185,6 +193,12 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
   useEffect(() => {
     if (!initialData && nameValue) setValue('slug', slugify(nameValue));
   }, [nameValue, initialData, setValue]);
+
+  useEffect(() => {
+    const selectedOption = publicCategories.find((category) => category.name === publicCategoryNameValue);
+    const nextSlug = selectedOption?.slug || normalizePublicCategorySlug(publicCategoryNameValue || '');
+    setValue('publicCategorySlug', nextSlug, { shouldDirty: Boolean(publicCategoryNameValue) });
+  }, [publicCategoryNameValue, publicCategories, setValue]);
 
   useEffect(() => {
     setValue('unit', derivedUnit, { shouldDirty: Boolean(selectedCategoryId) });
@@ -248,6 +262,8 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
         name: data.name.trim(),
         slug: data.slug.trim(),
         categoryId: data.categoryId,
+        publicCategoryName: data.publicCategoryName.trim(),
+        publicCategorySlug: normalizePublicCategorySlug(data.publicCategoryName),
         shortDescription: data.shortDescription.trim(),
         description: data.description?.trim() || '',
         images: toImageList(data.images),
@@ -278,10 +294,17 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
     }
   });
 
-  const categoryOptions = [{ value: '', label: 'Select Category' }, ...categories.map((category) => ({
+  const categoryOptions = [{ value: '', label: 'Select Category' }, ...CORE_PRODUCT_CATEGORIES.map((category) => ({
     value: category.slug,
     label: category.name,
   }))];
+  const publicCategoryOptions = [
+    { value: '', label: 'Select Public Category' },
+    ...publicCategories.map((category) => ({
+      value: category.name,
+      label: category.name,
+    })),
+  ];
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-8">
@@ -290,9 +313,14 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
         <div className="grid gap-4 sm:grid-cols-2">
           <input type="hidden" {...register('images')} />
           <input type="hidden" {...register('unit')} />
+          <input type="hidden" {...register('publicCategorySlug')} />
           <Input label="Product Name *" id="name" placeholder="e.g. Bamboo Dropper Bottle" error={errors.name?.message} {...register('name')} className="sm:col-span-2" />
           <Input label="Slug *" id="slug" placeholder="auto-generated" error={errors.slug?.message} {...register('slug')} />
-          <Select label="Category *" id="categoryId" options={categoryOptions} error={errors.categoryId?.message} {...register('categoryId')} />
+          <Select label="Admin Category *" id="categoryId" options={categoryOptions} error={errors.categoryId?.message} {...register('categoryId')} />
+          <Select label="Public Category *" id="publicCategoryName" options={publicCategoryOptions} error={errors.publicCategoryName?.message} {...register('publicCategoryName')} />
+          <p className="text-xs text-stone-500 sm:col-span-2">
+            Admin category is used for internal stock, purchase, and production structure. Public category is only used on the website.
+          </p>
           <Textarea label="Short Description *" id="shortDescription" placeholder="1-2 sentence overview" error={errors.shortDescription?.message} {...register('shortDescription')} className="sm:col-span-2" />
           <div className="sm:col-span-2">
             <Textarea

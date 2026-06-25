@@ -57,8 +57,8 @@ export default function ShippingPolicyPage() {
           <h2 className="text-xl font-bold text-stone-900 mb-2">7. Contact Us</h2>
           <p>
             For shipping-related queries, contact us at{' '}
-            <a href="mailto:ptcvirar@gmail.com" className="text-amber-700 font-semibold hover:text-amber-800 transition">
-              ptcvirar@gmail.com
+            <a href="mailto:customerservice.sspackaging@gmail.com" className="text-amber-700 font-semibold hover:text-amber-800 transition">
+              customerservice.sspackaging@gmail.com
             </a>
             .
           </p>

@@ -10,6 +10,7 @@ import {
   isProductionProductCategorySlug,
   normalizeCategorySlug,
 } from './product-categories';
+import { normalizePublicCategoryName, normalizePublicCategorySlug, resolveProductPublicCategory } from './public-product-categories';
 import { getProductUnitForCategory } from './product-units';
 import type {
   Address,
@@ -300,6 +301,12 @@ function getProductLabel(product: Pick<Product, 'capacity' | 'color'>): string {
 
 function sanitizeProductWriteData(data: Partial<Product>) {
   const sanitizedCategoryId = typeof data.categoryId === 'string' ? sanitizeOptionalText(data.categoryId) : '';
+  const sanitizedPublicCategoryName = typeof data.publicCategoryName === 'string'
+    ? normalizePublicCategoryName(data.publicCategoryName)
+    : '';
+  const sanitizedPublicCategorySlug = typeof data.publicCategorySlug === 'string'
+    ? normalizePublicCategorySlug(data.publicCategorySlug)
+    : '';
   const resolvedUnit = sanitizedCategoryId ? getProductUnitForCategory(sanitizedCategoryId) : undefined;
   const bottleWeightGram = sanitizeBottleWeightGram(data.bottle_weight_gram);
 
@@ -307,6 +314,12 @@ function sanitizeProductWriteData(data: Partial<Product>) {
     ...(typeof data.name === 'string' ? { name: sanitizeOptionalText(data.name) } : {}),
     ...(typeof data.slug === 'string' ? { slug: sanitizeOptionalText(data.slug) } : {}),
     ...(sanitizedCategoryId ? { categoryId: sanitizedCategoryId, category: sanitizedCategoryId } : {}),
+    ...(sanitizedPublicCategoryName
+      ? {
+          publicCategoryName: sanitizedPublicCategoryName,
+          publicCategorySlug: sanitizedPublicCategorySlug || normalizePublicCategorySlug(sanitizedPublicCategoryName),
+        }
+      : {}),
     ...(resolvedUnit ? { unit: resolvedUnit } : {}),
     ...(typeof data.shortDescription === 'string' ? { shortDescription: sanitizeOptionalText(data.shortDescription) } : {}),
     ...(typeof data.description === 'string' ? { description: sanitizeOptionalText(data.description) } : {}),
@@ -348,12 +361,22 @@ function normalizeProduct(id: string, data: Record<string, unknown>): Product {
   const migratedVariantImages = Array.isArray(firstVariant.images) ? (firstVariant.images as string[]).filter(Boolean) : [];
   const pricingTiers = normalizePricingTiers(data, legacyPrice);
   const bottleWeightGram = resolveProductBottleWeightGram(categoryId, inferProductionBottleWeightGram(data));
+  const publicCategoryName = normalizePublicCategoryName(
+    sanitizeOptionalText(data.publicCategoryName) ||
+    sanitizeOptionalText(data.publicCategory) ||
+    categoryId,
+  ) || categoryId;
+  const publicCategorySlug = normalizePublicCategorySlug(
+    sanitizeOptionalText(data.publicCategorySlug) || publicCategoryName || categoryId,
+  );
 
   return {
     id,
     name: sanitizeOptionalText(data.name),
     slug: sanitizeOptionalText(data.slug),
     categoryId,
+    publicCategoryName,
+    publicCategorySlug,
     shortDescription: sanitizeOptionalText(data.shortDescription),
     description: sanitizeOptionalText(data.description) || sanitizeOptionalText(data.shortDescription),
     images: images.length > 0 ? images : migratedVariantImages,
@@ -707,6 +730,22 @@ function isManagedCategory(category: Pick<Category, 'slug'>): boolean {
   return isCoreProductCategorySlug(category.slug);
 }
 
+function isPublicCategory(category: Pick<Category, 'slug'>): boolean {
+  return !isCoreProductCategorySlug(category.slug);
+}
+
+function normalizeCategory(id: string, data: Record<string, unknown>): Category {
+  return {
+    id,
+    name: sanitizeOptionalText(data.name),
+    slug: sanitizeOptionalText(data.slug),
+    description: sanitizeOptionalText(data.description),
+    image: sanitizeOptionalText(data.image),
+    order: typeof data.order === 'number' && Number.isFinite(data.order) ? data.order : 0,
+    active: Boolean(data.active),
+  };
+}
+
 function assertManagedCategorySlug(slug: string): void {
   if (!isCoreProductCategorySlug(slug)) {
     throw new Error('Only raw-material, production, and finished categories are allowed.');
@@ -719,25 +758,25 @@ export async function getCategories(): Promise<Category[]> {
   const q = query(collection(db, 'categories'), where('active', '==', true), orderBy('order'));
   const snap = await getDocs(q);
   return snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as Category))
-    .filter(isManagedCategory);
+    .map((d) => normalizeCategory(d.id, d.data()))
+    .filter(isPublicCategory);
 }
 
 export async function getAllCategories(): Promise<Category[]> {
   const q = query(collection(db, 'categories'), orderBy('order'));
   const snap = await getDocs(q);
   return snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as Category))
-    .filter(isManagedCategory);
+    .map((d) => normalizeCategory(d.id, d.data()))
+    .filter(isPublicCategory);
 }
 
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  const normalizedSlug = normalizeCategorySlug(slug);
-  if (!isCoreProductCategorySlug(normalizedSlug)) return null;
-  const q = query(collection(db, 'categories'), where('slug', '==', normalizedSlug));
+  const normalizedSlug = normalizePublicCategorySlug(slug);
+  const q = query(collection(db, 'categories'), where('slug', '==', normalizedSlug), limit(1));
   const snap = await getDocs(q);
   if (snap.empty) return null;
-  return { id: snap.docs[0].id, ...snap.docs[0].data() } as Category;
+  const category = normalizeCategory(snap.docs[0].id, snap.docs[0].data());
+  return isPublicCategory(category) ? category : null;
 }
 
 export async function createCategory(
@@ -745,7 +784,9 @@ export async function createCategory(
   actor?: string | AdminActivityActor,
 ): Promise<string> {
   const normalizedSlug = normalizeCategorySlug(data.slug);
-  assertManagedCategorySlug(normalizedSlug);
+  if (isCoreProductCategorySlug(normalizedSlug)) {
+    throw new Error('This slug is reserved for admin categories.');
+  }
   const ref = await addDoc(collection(db, 'categories'), { ...data, slug: normalizedSlug, createdAt: serverTimestamp() });
   await logAdminActivity({
     action: 'create',
@@ -768,7 +809,10 @@ export async function updateCategory(
   actor?: string | AdminActivityActor,
 ): Promise<void> {
   if (typeof data.slug === 'string') {
-    assertManagedCategorySlug(normalizeCategorySlug(data.slug));
+    const normalizedSlug = normalizeCategorySlug(data.slug);
+    if (isCoreProductCategorySlug(normalizedSlug)) {
+      throw new Error('This slug is reserved for admin categories.');
+    }
   }
   await updateDoc(doc(db, 'categories', id), {
     ...data,
@@ -814,6 +858,12 @@ export async function getProducts(categoryId?: string): Promise<Product[]> {
   const products = snap.docs.map(d => normalizeProduct(d.id, d.data()));
   if (!categoryId) return products;
   return products.filter((product) => product.categoryId === categoryId);
+}
+
+export async function getProductsByPublicCategory(publicCategorySlug: string): Promise<Product[]> {
+  const normalizedSlug = normalizePublicCategorySlug(publicCategorySlug);
+  const products = await getProducts();
+  return products.filter((product) => product.publicCategorySlug === normalizedSlug);
 }
 
 export async function getAllProducts(): Promise<Product[]> {
@@ -893,6 +943,8 @@ export async function backfillProductStockFields(): Promise<number> {
     batch.update(productDoc.ref, {
       categoryId: normalizedProduct.categoryId,
       category: normalizedProduct.categoryId,
+      publicCategoryName: normalizedProduct.publicCategoryName,
+      publicCategorySlug: normalizedProduct.publicCategorySlug,
       unit: normalizedProduct.unit,
       description: normalizedProduct.description,
       images: normalizedProduct.images,

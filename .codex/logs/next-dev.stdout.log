@@ -1,0 +1,19 @@
+
+> ss-packaging@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.110:3000
+- Environments: .env.local
+✓ Ready in 1356ms
+Creating turbopack project {
+  dir: 'C:\\Users\\Admin\\OneDrive\\Desktop\\SSPACKING',
+  testMode: true
+}
+- Experiments (use with caution):
+  · proxyClientMaxBodySize: "100mb"
+
+ POST /api/quote-email 200 in 7.8s (next.js: 396ms, application-code: 7.4s)
+ GET /contact 200 in 1236ms (next.js: 380ms, application-code: 856ms)
+[?25h

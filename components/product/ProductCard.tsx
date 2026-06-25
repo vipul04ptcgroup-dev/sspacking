@@ -2,17 +2,18 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Eye } from 'lucide-react';
-import type { Product } from '@/types';
+import { ArrowRight } from 'lucide-react';
+import type { ClientProduct } from '@/lib/client-serialization';
+import { resolveProductPublicCategory } from '@/lib/public-product-categories';
 import { formatPrice } from '@/lib/utils';
 
 interface ProductCardProps {
-  product: Product;
+  product: ClientProduct;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
   const pricingTiers = [...product.pricingTiers].sort((left, right) => left.minQty - right.minQty);
-  const lowestTier = pricingTiers.reduce<Product['pricingTiers'][number] | null>((lowest, tier) => {
+  const lowestTier = pricingTiers.reduce<ClientProduct['pricingTiers'][number] | null>((lowest, tier) => {
     if (!lowest || tier.unitPrice < lowest.unitPrice) return tier;
     return lowest;
   }, null);
@@ -20,13 +21,14 @@ export default function ProductCard({ product }: ProductCardProps) {
   const isOutOfStock = product.stockQuantity <= 0;
 
   const previewImage = product.images?.[0] || '';
-  const productUrl = `/products/${product.categoryId}/${product.slug}`;
+  const publicCategory = resolveProductPublicCategory(product);
+  const productUrl = `/products/${publicCategory.slug}/${product.slug}`;
   const enquiryUrl = `/contact?product=${encodeURIComponent(product.name)}&productUrl=${encodeURIComponent(productUrl)}#quote`;
 
   return (
-    <div className="group bg-white rounded-2xl border border-stone-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
+    <div className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-38px_rgba(217,119,6,0.24)]">
       <Link href={productUrl} className="block">
-        <div className="relative aspect-square bg-stone-50 overflow-hidden">
+        <div className="relative aspect-[1/1] overflow-hidden bg-[linear-gradient(145deg,#f8f5ef_0%,#ffffff_52%,#eef2f6_100%)]">
           {previewImage ? (
             <Image
               src={previewImage}
@@ -60,36 +62,38 @@ export default function ProductCard({ product }: ProductCardProps) {
                 ? 'Low stock'
                 : 'In stock'}
           </div>
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
-            <div className="bg-white text-stone-700 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-lg">
-              <Eye className="w-3.5 h-3.5" /> View
-            </div>
-          </div>
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/85 to-transparent" />
         </div>
       </Link>
 
-      <div className="p-4">
-        <Link href={productUrl} className="block">
-          <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide mb-1">{product.categoryId}</p>
-          <h3 className="text-sm font-bold text-stone-900 group-hover:text-amber-700 transition leading-snug line-clamp-2 mb-2">{product.name}</h3>
-          <p className="text-xs text-stone-500 line-clamp-2 mb-3">{product.shortDescription}</p>
-        </Link>
+      <div className="space-y-4 p-4">
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-600">
+            {publicCategory.name}
+          </p>
+          <Link href={productUrl} className="block">
+            <h3 className="text-base font-black leading-snug text-stone-900 transition group-hover:text-amber-700 line-clamp-2">
+              {product.name}
+            </h3>
+          </Link>
+        </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            {hasPrice && lowestTier && (
-              <span className="text-base font-black text-stone-900">{formatPrice(lowestTier.unitPrice)}</span>
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            {hasPrice && lowestTier ? (
+              <p className="text-2xl font-black leading-none text-stone-950">{formatPrice(lowestTier.unitPrice)}</p>
+            ) : (
+              <p className="text-lg font-bold text-stone-500">Price on request</p>
             )}
-            <p className={`text-[10px] mt-0.5 ${isOutOfStock ? 'text-red-500' : 'text-stone-400'}`}>
-              {isOutOfStock
-                ? 'Checkout unavailable'
-                : pricingTiers.length > 1
-                  ? `${pricingTiers.length} pricing tiers`
-                  : 'Single product pricing'}
+            <p className={`mt-1 text-[11px] font-medium ${isOutOfStock ? 'text-red-500' : 'text-stone-400'}`}>
+              {isOutOfStock ? 'Currently unavailable' : 'Request bulk pricing'}
             </p>
           </div>
-          <Link href={enquiryUrl} className="inline-flex items-center rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-bold text-amber-600 hover:bg-amber-50 transition">
-            Enquiry
+          <Link
+            href={enquiryUrl}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#111827] px-4 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-white transition hover:bg-[#1f2937]"
+          >
+            Enquiry <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </div>

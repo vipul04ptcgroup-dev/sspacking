@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
+import { serializeProductForClient } from '@/lib/client-serialization';
 import { getCategoryBySlug, getProductBySlug } from '@/lib/firestore';
 import ProductDetailPageClient from '@/components/product/ProductDetailPageClient';
+import { resolveProductPublicCategory } from '@/lib/public-product-categories';
 import { buildProductSchema } from '@/src/seo/productSchema';
 import { buildBreadcrumbSchema } from '@/src/seo/breadcrumbSchema';
 import { buildWebPageSchema } from '@/src/seo/webpageSchema';
@@ -52,6 +54,8 @@ export default async function ProductDetailPage({
   ]);
 
   if (!product) return notFound();
+  if (resolveProductPublicCategory(product).slug !== category) return notFound();
+  const clientProduct = serializeProductForClient(product);
 
   return (
     <>
@@ -77,7 +81,7 @@ export default async function ProductDetailPage({
           ]),
         ]}
       />
-      <ProductDetailPageClient category={category} slug={slug} product={product} />
+      <ProductDetailPageClient slug={slug} product={clientProduct} />
     </>
   );
 }

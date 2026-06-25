@@ -53,9 +53,9 @@ export async function getAllSitemapEntries(): Promise<SitemapEntry[]> {
       }));
 
     const productEntries: SitemapEntry[] = products
-      .filter(p => Boolean(p?.slug) && Boolean(p?.categoryId))
+      .filter(p => Boolean(p?.slug) && Boolean(p?.publicCategorySlug))
       .map(p => {
-        const path = `/products/${safeSegment(p.categoryId)}/${safeSegment(p.slug)}`;
+        const path = `/products/${safeSegment(p.publicCategorySlug)}/${safeSegment(p.slug)}`;
         return {
           path,
           url: toAbsolute(path),

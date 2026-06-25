@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { getCategoryBySlug, getProducts } from '@/lib/firestore';
+import { serializeProductsForClient } from '@/lib/client-serialization';
+import { getCategoryBySlug, getProductsByPublicCategory } from '@/lib/firestore';
 import ProductGrid from '@/components/product/ProductGrid';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
@@ -12,7 +13,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
 
   if (!category) return notFound();
 
-  const products = await getProducts(category.slug);
+  const products = await getProductsByPublicCategory(category.slug);
+  const clientProducts = serializeProductsForClient(products);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -42,7 +44,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
         <p className="text-stone-400 text-sm mt-2">{products.length} product{products.length !== 1 ? 's' : ''}</p>
       </div>
 
-      <ProductGrid products={products} loading={false} />
+      <ProductGrid products={clientProducts} loading={false} />
     </div>
   );
 }

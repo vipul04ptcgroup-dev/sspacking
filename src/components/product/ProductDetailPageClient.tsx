@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { MessageSquare, Package } from 'lucide-react';
+import type { ClientProduct } from '@/lib/client-serialization';
 import { formatMeasurementValue, formatQuantityWithUnit, getProductUnitLabel } from '@/lib/product-units';
-import type { Product } from '@/types';
 import { formatPrice } from '@/lib/utils';
 
 type DescriptionBlock =
@@ -48,7 +48,7 @@ export default function ProductDetailPageClient({
 }: {
   category: string;
   slug: string;
-  product: Product;
+  product: ClientProduct;
 }) {
   const router = useRouter();
   const [selectedImage, setSelectedImage] = useState(0);

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { MessageSquare, Package } from 'lucide-react';
-import { formatMeasurementValue, formatQuantityWithUnit, getProductUnitLabel } from '@/lib/product-units';
-import type { Product } from '@/types';
+import type { ClientProduct } from '@/lib/client-serialization';
+import { resolveProductPublicCategory } from '@/lib/public-product-categories';
+import { formatMeasurementValue, getProductUnitLabel } from '@/lib/product-units';
 import { formatPrice } from '@/lib/utils';
 
 type DescriptionBlock =
@@ -42,15 +42,12 @@ function buildDescriptionBlocks(description: string): DescriptionBlock[] {
 }
 
 export default function ProductDetailPageClient({
-  category,
   slug,
   product,
 }: {
-  category: string;
   slug: string;
-  product: Product;
+  product: ClientProduct;
 }) {
-  const router = useRouter();
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState<'description' | 'attributes'>('description');
 
@@ -59,7 +56,8 @@ export default function ProductDetailPageClient({
   const startingPrice = pricingTiers.length > 0 ? Math.min(...pricingTiers.map((tier) => tier.unitPrice)) : null;
   const isOutOfStock = product.stockQuantity <= 0;
   const descriptionBlocks = buildDescriptionBlocks(product.description);
-  const productUrl = `/products/${category}/${slug}`;
+  const publicCategory = resolveProductPublicCategory(product);
+  const productUrl = `/products/${publicCategory.slug}/${slug}`;
   const enquiryUrl = `/contact?product=${encodeURIComponent(product.name)}&productUrl=${encodeURIComponent(productUrl)}#quote`;
   const specRows = [
     ['Capacity', product.capacity],
@@ -83,16 +81,6 @@ export default function ProductDetailPageClient({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="mb-8 flex flex-wrap items-center gap-2 text-sm text-stone-500">
-        <span>Home</span>
-        <span>/</span>
-        <span>Products</span>
-        <span>/</span>
-        <span>{product.categoryId}</span>
-        <span>/</span>
-        <span className="max-w-[200px] truncate font-medium text-stone-900">{product.name}</span>
-      </div>
-
       <div className="grid gap-12 lg:grid-cols-2">
         <div>
           <div className="relative mb-4 aspect-square overflow-hidden rounded-2xl bg-stone-50">
@@ -118,14 +106,7 @@ export default function ProductDetailPageClient({
         </div>
 
         <div>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="mb-4 text-sm font-semibold text-stone-700 hover:text-amber-600"
-          >
-            {'< Back'}
-          </button>
-          <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-amber-600">{product.categoryId}</p>
+          <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-amber-600">{publicCategory.name}</p>
           <h1 className="mb-4 text-3xl font-black leading-tight text-stone-900">{product.name}</h1>
           <p className="mb-4 text-sm leading-relaxed text-stone-500">{product.shortDescription}</p>
 
@@ -147,22 +128,20 @@ export default function ProductDetailPageClient({
                   ? 'Low stock'
                   : 'In stock'}
             </span>
-            <p className="mt-2 text-sm text-stone-500">
-              Available stock: <span className="font-semibold text-stone-900">{formatQuantityWithUnit(product.stockQuantity, product.unit)}</span>
-            </p>
             {isOutOfStock ? (
               <p className="mt-2 text-sm font-medium text-red-600">This product is out of stock, so checkout is unavailable right now.</p>
             ) : null}
           </div>
 
           {quickAttributes.length > 0 ? (
-            <div className="mb-6 flex flex-wrap gap-2">
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {quickAttributes.map(([label, value]) => (
                 <div
                   key={label}
-                  className="rounded-full border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700"
+                  className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3"
                 >
-                  <span className="font-semibold text-stone-900">{label}:</span> {value}
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{label}</p>
+                  <p className="mt-1 text-sm font-medium text-stone-900">{value}</p>
                 </div>
               ))}
             </div>

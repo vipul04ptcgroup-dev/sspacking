@@ -1,7 +1,18 @@
-'use client';
-
 import Link from 'next/link';
-import { ArrowRight, Shield, Leaf, Award, Truck } from 'lucide-react';
+import Image from 'next/image';
+import {
+  ArrowRight,
+  BadgeCheck,
+  Boxes,
+  CheckCircle2,
+  CircleDollarSign,
+  Factory,
+  MapPin,
+  Palette,
+  PhoneCall,
+  Truck,
+} from 'lucide-react';
+import { COMPANY_DETAILS } from '@/lib/company';
 
 export function HeroBanner() {
   return (
@@ -93,30 +104,147 @@ export function HeroBanner() {
 }
 
 export function FeaturesSection() {
-  const features = [
-    { icon: Shield, title: 'Quality Assured', desc: 'Every product passes rigorous quality checks before it reaches you.' },
-    { icon: Leaf, title: 'Eco-Friendly', desc: 'Sustainable packaging options that are better for our planet.' },
-    { icon: Award, title: 'Premium Materials', desc: 'Sourced from the finest suppliers - bamboo, glass, and beyond.' },
-    { icon: Truck, title: 'Pan-India Delivery', desc: 'Fast and reliable shipping to every corner of India.' },
+  const highlightItems = [
+    { icon: Boxes, title: '5000+', label: 'Packaging SKUs' },
+    { icon: Factory, title: 'Bulk', label: 'Manufacturing Support' },
+    { icon: MapPin, title: 'PAN India', label: 'Supply & dispatch' },
+    { icon: Palette, title: 'Custom', label: 'Branding & finishes' },
+    { icon: Truck, title: 'Fast', label: 'Reliable delivery' },
+    { icon: BadgeCheck, title: 'OEM', label: 'Private label support' },
   ];
 
   return (
-    <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-black text-stone-900">Why Choose SS Packaging?</h2>
-          <p className="mt-3 text-stone-500 max-w-xl mx-auto">We combine design, durability, and sustainability to deliver packaging that works as hard as you do.</p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map(f => (
-            <div key={f.title} className="text-center p-6 rounded-2xl border border-stone-100 hover:border-amber-200 hover:shadow-lg transition-all group">
-              <div className="w-14 h-14 bg-amber-50 group-hover:bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-colors">
-                <f.icon className="w-7 h-7 text-amber-600" />
+    <section className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,#fff_0%,#fffaf3_100%)] pt-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="relative z-10 -mt-10 overflow-hidden rounded-[22px] border border-stone-200/80 bg-white shadow-[0_22px_55px_-32px_rgba(15,23,42,0.35)] md:-mt-12">
+          <div className="grid md:grid-cols-3 xl:grid-cols-6">
+            {highlightItems.map((item) => (
+              <div
+                key={item.label}
+                className="flex min-h-[104px] items-center gap-4 border-b border-stone-200 px-6 py-5 transition hover:bg-stone-50/50 md:border-b-0 md:border-r last:border-b-0 xl:px-7"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-200/80 bg-amber-50 text-[#d3a24c]">
+                  <item.icon className="h-[18px] w-[18px]" />
+                </div>
+                <div>
+                  <div className="text-[1.3rem] font-bold leading-[0.98] tracking-[-0.025em] text-stone-900">
+                    {item.title}
+                  </div>
+                  <div className="mt-1.5 text-[12px] font-medium leading-[1.35] tracking-[0.01em] text-stone-500">
+                    {item.label}
+                  </div>
+                </div>
               </div>
-              <h3 className="text-base font-bold text-stone-900 mb-2">{f.title}</h3>
-              <p className="text-sm text-stone-500 leading-relaxed">{f.desc}</p>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function WhyChooseSection() {
+  const reasons = [
+    'Premium Quality Materials',
+    'Custom Sizes & Colors',
+    'Leak Proof & Durable Products',
+    'OEM Manufacturing Support',
+    'Competitive Bulk Pricing',
+    'Fast PAN India Delivery',
+    'Large Inventory Availability',
+  ];
+
+  return (
+    <section className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,#fff_0%,#fffaf3_100%)] pb-12 pt-6 sm:pb-16 lg:pb-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mt-10 grid gap-6 lg:mt-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+          <div className="relative overflow-hidden rounded-[10px] border border-stone-200 bg-white shadow-[0_16px_40px_-34px_rgba(15,23,42,0.22)]">
+            <div className="relative min-h-[240px] sm:min-h-[300px] lg:min-h-[320px]">
+              <Image
+                src="/HomeWhySS.png"
+                alt="SS Packaging manufacturing and supply solutions"
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 52vw"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.01)_0%,rgba(15,23,42,0.08)_100%)]" />
             </div>
-          ))}
+          </div>
+
+          <div className="bg-transparent px-0 py-1 sm:px-1 lg:px-2 lg:py-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600">Why Choose Us</p>
+            <h2 className="mt-2 max-w-[560px] text-[1.95rem] font-black leading-[1.08] tracking-[-0.03em] text-stone-950 sm:text-[2.15rem]">
+              Why Industries Trust SS Packaging?
+            </h2>
+
+            <div className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+              {reasons.map((reason) => (
+                <div key={reason} className="flex items-start gap-2.5">
+                  <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-amber-500">
+                    <CheckCircle2 className="h-[11px] w-[11px]" />
+                  </div>
+                  <p className="text-[14px] font-medium leading-[1.5] text-stone-700">{reason}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-7">
+              <Link
+                href="/contact#quote"
+                className="inline-flex items-center justify-center gap-2 rounded-[4px] bg-[#08111f] px-6 py-3 text-[13px] font-bold uppercase tracking-[0.03em] text-white transition hover:bg-[#12243c]"
+              >
+                Get Free Consultation <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+export function IndustriesSection() {
+  const industries = [
+    { image: '/Cosmetic.png', label: 'Cosmetics' },
+    { image: '/Pharmaceuticals.png', label: 'Pharmaceuticals' },
+    { image: '/food.png', label: 'Food & Beverage' },
+    { image: '/chemical.png', label: 'Chemicals' },
+    { image: '/industries.png', label: 'Industrial' },
+    { image: '/export.png', label: 'Export Businesses' },
+  ];
+
+  return (
+    <section className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.12),_transparent_28%),linear-gradient(180deg,#fff_0%,#fffaf3_100%)] pb-12 pt-2 sm:pb-16 lg:pb-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="sm:p-2">
+          <h2 className="text-center text-[2.1rem] font-black leading-[1.08] tracking-[-0.03em] text-[#08111f] sm:text-[2.5rem]">
+            Industries We Serve
+          </h2>
+          <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {industries.map((industry) => (
+              <div
+                key={industry.label}
+                className="group relative overflow-hidden rounded-[14px] border border-stone-200 shadow-[0_12px_30px_-28px_rgba(15,23,42,0.18)] transition hover:-translate-y-1 hover:shadow-[0_18px_36px_-28px_rgba(217,119,6,0.2)]"
+              >
+                <div className="relative h-44 w-full">
+                  <Image
+                    src={industry.image}
+                    alt={industry.label}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 1024px) 50vw, 33vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#08111f]/80 via-[#08111f]/20 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-5">
+                    <span className="text-lg font-bold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
+                      {industry.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -124,20 +252,162 @@ export function FeaturesSection() {
 }
 
 export function CTASection() {
+  const customServices = [
+    'Logo Printing',
+    'Color Customization',
+    'Bottle Development',
+    'Labeling Support',
+    'OEM Manufacturing',
+  ];
+
+  const testimonials = [
+    {
+      quote: 'Excellent quality products and timely delivery. SS Packaging is our trusted packaging partner.',
+      author: 'Rohit Sharma',
+      role: 'Cosmetic Manufacturer',
+    },
+    {
+      quote: 'Best supplier for cosmetic packaging. Wide range and great service with quick coordination.',
+      author: 'Neha Verma',
+      role: 'Personal Care Brand',
+    },
+    {
+      quote: 'Reliable for bulk orders and their customization support is practical and responsive.',
+      author: 'Amit Patel',
+      role: 'Pharma Company',
+    },
+  ];
+
+  const trustedBrands = ['Lotus', 'Himalaya', 'Patanjali', 'Zydus', 'Dabur', 'Wipro', 'Emami'];
+
   return (
-    <section className="py-20 bg-amber-600">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">Need Custom Packaging?</h2>
-        <p className="text-amber-100 text-lg mb-8 max-w-xl mx-auto">
-          Whether you need 100 pieces or 100,000 - we handle bulk orders with custom branding, sizes, and materials.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/contact#quote" className="inline-flex items-center justify-center gap-2 bg-white text-amber-700 font-bold px-8 py-4 rounded-xl hover:bg-amber-50 transition shadow-lg">
-            Request a Quote <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link href="/products" className="inline-flex items-center justify-center gap-2 bg-amber-700 text-white font-semibold px-8 py-4 rounded-xl hover:bg-amber-800 transition">
-            Browse Products
-          </Link>
+    <section className="bg-white py-14 sm:py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-[32px] bg-[linear-gradient(120deg,#050505_0%,#121212_44%,#27170b_100%)] text-white shadow-[0_35px_90px_-50px_rgba(0,0,0,0.85)]">
+          <div className="grid gap-8 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1.2fr_0.8fr] lg:px-10">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Need Custom Packaging?</p>
+              <h2 className="mt-3 max-w-2xl text-3xl font-black leading-tight sm:text-4xl">
+                From concept to production, we build packaging that fits your brand and your volume.
+              </h2>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-300 sm:text-base">
+                Whether you need specialized bottles, OEM support or branded packaging for launch-ready products, our team can help you move faster with practical manufacturing guidance.
+              </p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/contact#quote"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3.5 font-bold text-stone-950 transition hover:bg-amber-400"
+                >
+                  Start Your Project <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/products"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3.5 font-semibold text-white transition hover:bg-white/10"
+                >
+                  Browse Products
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {customServices.map((service) => (
+                <div
+                  key={service}
+                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm font-semibold text-stone-100"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-300">
+                    <CircleDollarSign className="h-5 w-5" />
+                  </div>
+                  <span>{service}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_1.05fr] lg:items-start">
+          <div className="rounded-[30px] border border-stone-200 bg-[linear-gradient(180deg,#fff_0%,#faf7f0_100%)] p-6 shadow-[0_25px_70px_-50px_rgba(15,23,42,0.35)] sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-600">About SS Packaging</p>
+            <div className="mt-4 flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-100 bg-white shadow-sm">
+                <Image
+                  src={COMPANY_DETAILS.logoPath}
+                  alt={COMPANY_DETAILS.legalName}
+                  width={46}
+                  height={46}
+                  className="h-auto w-auto"
+                />
+              </div>
+              <div>
+                <h3 className="text-3xl font-black text-stone-900">Packaging that protects, preserves and elevates.</h3>
+              </div>
+            </div>
+            <p className="mt-5 text-sm leading-7 text-stone-600 sm:text-base">
+              SS Packaging is a trusted manufacturer and supplier of premium packaging solutions for cosmetic, pharmaceutical, food, FMCG and industrial applications. We focus on consistent quality, flexible order support and dependable execution for Indian businesses.
+            </p>
+            <p className="mt-4 text-sm leading-7 text-stone-600 sm:text-base">
+              Our team supports both growing brands and established buyers with practical recommendations, responsive communication and product options that are ready for scale.
+            </p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/about"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-950 px-6 py-3.5 font-semibold text-white transition hover:bg-stone-800"
+              >
+                About Us
+              </Link>
+              <Link
+                href="/contact"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-6 py-3.5 font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                Contact Team
+              </Link>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="rounded-[30px] border border-stone-200 bg-white p-6 shadow-[0_25px_70px_-50px_rgba(15,23,42,0.35)] sm:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-600">What Our Clients Say</p>
+                  <h3 className="mt-2 text-2xl font-black text-stone-900">Trusted by repeat buyers and growing brands.</h3>
+                </div>
+                <div className="hidden rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 sm:block">
+                  4.9/5 Service Experience
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 xl:grid-cols-3">
+                {testimonials.map((item) => (
+                  <div key={item.author} className="rounded-2xl border border-stone-100 bg-stone-50 p-5">
+                    <div className="mb-3 flex text-amber-500">
+                      {'★★★★★'.split('').map((star, index) => (
+                        <span key={`${item.author}-${index}`}>{star}</span>
+                      ))}
+                    </div>
+                    <p className="text-sm leading-6 text-stone-600">{item.quote}</p>
+                    <div className="mt-4">
+                      <div className="font-bold text-stone-900">{item.author}</div>
+                      <div className="text-xs text-stone-500">{item.role}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[30px] border border-stone-200 bg-stone-950 px-6 py-8 text-white shadow-[0_30px_80px_-50px_rgba(0,0,0,0.75)] sm:px-8">
+              <p className="text-center text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Trusted by Leading Brands</p>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
+                {trustedBrands.map((brand) => (
+                  <div
+                    key={brand}
+                    className="flex min-h-[68px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-center text-sm font-bold text-stone-100"
+                  >
+                    {brand}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

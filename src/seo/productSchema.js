@@ -34,7 +34,7 @@ export function buildProductSchema({ path, product, category, aggregateRating })
     description,
     image: images,
     sku: product.sku || undefined,
-    category: category?.name || product.categoryId || undefined,
+    category: category?.name || product.publicCategoryName || product.categoryId || undefined,
     keywords: dedupeStrings([
       ...(product.tags || []),
       product.material,

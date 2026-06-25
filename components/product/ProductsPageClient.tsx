@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import type { Product, Category } from '@/types';
+import type { ClientCategory, ClientProduct } from '@/lib/client-serialization';
 import { SlidersHorizontal, X } from 'lucide-react';
 
 const ProductGrid = dynamic(() => import('@/components/product/ProductGrid'), {
@@ -32,16 +32,16 @@ function ProductsContent({
   initialProducts,
   initialCategories,
 }: {
-  initialProducts: Product[];
-  initialCategories: Category[];
+  initialProducts: ClientProduct[];
+  initialCategories: ClientCategory[];
 }) {
   const INITIAL_PRODUCTS_TO_SHOW = 12;
   const PRODUCTS_BATCH_SIZE = 16;
   const LOAD_MORE_DELAY_MS = 120;
   const searchParams = useSearchParams();
   const q = searchParams?.get('q') || '';
-  const [products] = useState<Product[]>(initialProducts);
-  const [categories] = useState<Category[]>(initialCategories);
+  const [products] = useState<ClientProduct[]>(initialProducts);
+  const [categories] = useState<ClientCategory[]>(initialCategories);
   const [loading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [sortBy, setSortBy] = useState('default');
@@ -57,7 +57,8 @@ function ProductsContent({
       p.name.toLowerCase().includes(lq) ||
       p.shortDescription.toLowerCase().includes(lq) ||
       p.tags.some((t) => t.toLowerCase().includes(lq)) ||
-      p.categoryId.toLowerCase().includes(lq) ||
+      p.publicCategoryName.toLowerCase().includes(lq) ||
+      p.publicCategorySlug.toLowerCase().includes(lq) ||
       p.sku.toLowerCase().includes(lq),
     );
   }
@@ -69,10 +70,10 @@ function ProductsContent({
 
   if (selectedCategory) {
     if (selectedCategory === OTHER_CATEGORY_KEY) {
-      filtered = filtered.filter((p) => !knownCategoryKeys.has(normalizeCategory(p.categoryId || '')));
+      filtered = filtered.filter((p) => !knownCategoryKeys.has(normalizeCategory(p.publicCategorySlug || '')));
     } else {
       filtered = filtered.filter(
-        (p) => normalizeCategory(p.categoryId || '') === normalizeCategory(selectedCategory),
+        (p) => normalizeCategory(p.publicCategorySlug || '') === normalizeCategory(selectedCategory),
       );
     }
   }
@@ -192,8 +193,8 @@ function ProductsContent({
 }
 
 export default function ProductsPageClient(props: {
-  initialProducts: Product[];
-  initialCategories: Category[];
+  initialProducts: ClientProduct[];
+  initialCategories: ClientCategory[];
 }) {
   return (
     <Suspense fallback={<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10" />}>

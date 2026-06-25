@@ -1,27 +1,32 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { serializeProductsForClient } from '@/lib/client-serialization';
 import { getFeaturedProducts } from '@/lib/firestore';
 import ProductCard from '@/components/product/ProductCard';
 
 export default async function FeaturedProducts() {
   const products = await getFeaturedProducts().catch(() => []);
+  const clientProducts = serializeProductsForClient(products);
 
-  if (!products.length) return null;
+  if (!clientProducts.length) return null;
 
   return (
-    <section className="py-20 bg-stone-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-end justify-between mb-10">
+    <section className="bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-14 sm:py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-10 flex items-end justify-between">
           <div>
-            <p className="text-amber-600 font-semibold text-sm uppercase tracking-widest mb-2">Handpicked</p>
-            <h2 className="text-3xl sm:text-4xl font-black text-stone-900">Featured Products</h2>
+            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.24em] text-amber-600">Featured Products</p>
+            <h2 className="text-3xl font-black text-stone-900 sm:text-4xl">Popular picks from our catalog</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-500">
+              A quick look at highlighted packaging products currently featured on the site. Use these to start product discovery or request a quote faster.
+            </p>
           </div>
-          <Link href="/products" className="hidden sm:flex items-center gap-2 text-amber-600 font-semibold text-sm hover:gap-3 transition-all">
+          <Link href="/products" className="hidden items-center gap-2 text-sm font-semibold text-amber-600 transition-all hover:gap-3 sm:flex">
             View All <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-          {products.map(p => <ProductCard key={p.id} product={p} />)}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-6">
+          {clientProducts.map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
         <div className="mt-8 text-center sm:hidden">
           <Link href="/products" className="inline-flex items-center gap-2 text-amber-600 font-semibold">

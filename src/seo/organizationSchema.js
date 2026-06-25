@@ -25,7 +25,7 @@ export const SITE_KEYWORDS = [
 
 export const BUSINESS_DETAILS = {
   phone: '+91 91208 79879',
-  email: 'ptcvirar@gmail.com',
+  email: 'customerservice.sspackaging@gmail.com',
   officeAddress:
     'Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra, India.',
   factoryAddress:

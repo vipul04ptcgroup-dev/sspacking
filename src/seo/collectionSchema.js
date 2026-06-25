@@ -20,7 +20,7 @@ export function buildCollectionSchema({
     .map((product, index) => ({
       '@type': 'ListItem',
       position: index + 1,
-      url: buildAbsoluteUrl(`/products/${product.categoryId}/${product.slug}`),
+      url: buildAbsoluteUrl(`/products/${product.publicCategorySlug || product.categoryId}/${product.slug}`),
       name: product.name,
       image: normalizeImages(product.images || [])[0],
     }));
@@ -39,7 +39,7 @@ export function buildCollectionSchema({
       '@id': buildSchemaId('/', 'organization'),
     },
     keywords: dedupeStrings(
-      normalizedProducts.flatMap((product) => [product.categoryId, ...(product.tags || [])]),
+      normalizedProducts.flatMap((product) => [product.publicCategoryName || product.categoryId, ...(product.tags || [])]),
     ).join(', ') || undefined,
     numberOfItems: normalizedProducts.length,
     mainEntity: {

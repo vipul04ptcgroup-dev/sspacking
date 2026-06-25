@@ -10,6 +10,6 @@ export const COMPANY_DETAILS = {
     'Unit no. 13, Pragati Compound, Dongri Pada Road, near Jain Mandir, Poman, Vasai East, Palghar - 401208, Maharashtra, India',
   ],
   contactNumber: '+91 91208 79879',
-  email: 'ptcvirar@gmail.com',
+  email: 'customerservice.sspackaging@gmail.com',
   gstin: '-',
 } as const;
