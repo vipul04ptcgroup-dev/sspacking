@@ -11,7 +11,7 @@ export default async function FeaturedProducts() {
   if (!clientProducts.length) return null;
 
   return (
-    <section className="bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-14 sm:py-16 lg:py-20">
+    <section className="bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-10 sm:py-12 lg:py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 flex items-end justify-between">
           <div>
@@ -25,8 +25,18 @@ export default async function FeaturedProducts() {
             View All <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-6">
-          {clientProducts.map((p) => <ProductCard key={p.id} product={p} />)}
+        <div
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {clientProducts.map((p) => (
+            <div
+              key={p.id}
+              className="min-w-[82%] snap-start sm:min-w-[48%] lg:min-w-[31%] xl:min-w-[23.5%]"
+            >
+              <ProductCard product={p} />
+            </div>
+          ))}
         </div>
         <div className="mt-8 text-center sm:hidden">
           <Link href="/products" className="inline-flex items-center gap-2 text-amber-600 font-semibold">

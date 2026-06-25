@@ -31,7 +31,7 @@ export default async function CategoryGrid() {
               href={`/products/${cat.slug}`}
               className="group relative min-w-[280px] overflow-hidden rounded-[10px] border border-stone-200 bg-white shadow-[0_16px_40px_-34px_rgba(15,23,42,0.28)] transition-all duration-300 hover:-translate-y-1 hover:border-amber-200 hover:shadow-[0_24px_60px_-40px_rgba(217,119,6,0.22)] lg:min-w-0"
             >
-              <div className="relative min-h-[220px] sm:min-h-[250px] lg:min-h-[285px] overflow-hidden bg-[linear-gradient(145deg,#f8f5ef_0%,#ffffff_52%,#eef2f6_100%)]">
+              <div className="relative min-h-[260px] sm:min-h-[250px] lg:min-h-[285px] overflow-hidden bg-[linear-gradient(145deg,#f8f5ef_0%,#ffffff_52%,#eef2f6_100%)]">
                 {cat.image ? (
                   <Image
                     src={cat.image}
@@ -50,17 +50,17 @@ export default async function CategoryGrid() {
                 <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/88 to-transparent" />
               </div>
 
-              <div className="absolute inset-x-4 bottom-4 flex items-center gap-2.5 rounded-[8px] border border-stone-200 bg-white px-3 py-2.5 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.25)]">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0f172a] text-white">
-                  <Package2 className="h-4 w-4" />
+              <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-[8px] border border-stone-200 bg-white px-2.5 py-2 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.25)] sm:inset-x-4 sm:bottom-4 sm:gap-2.5 sm:px-3 sm:py-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0f172a] text-white sm:h-10 sm:w-10">
+                  <Package2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-[13px] font-bold leading-tight text-stone-900 sm:text-sm">
+                  <h3 className="text-[12px] font-bold leading-tight text-stone-900 sm:text-sm">
                     {cat.name}
                   </h3>
                 </div>
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-300 text-amber-500 transition group-hover:bg-amber-50">
-                  <ArrowRight className="h-[13px] w-[13px]" />
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-amber-300 text-amber-500 transition group-hover:bg-amber-50 sm:h-7 sm:w-7">
+                  <ArrowRight className="h-3 w-3 sm:h-[13px] sm:w-[13px]" />
                 </div>
               </div>
             </Link>

@@ -114,23 +114,23 @@ export function FeaturesSection() {
   ];
 
   return (
-    <section className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,#fff_0%,#fffaf3_100%)] pt-8">
+    <section className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,#fff_0%,#fffaf3_100%)] pt-6 sm:pt-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative z-10 -mt-10 overflow-hidden rounded-[22px] border border-stone-200/80 bg-white shadow-[0_22px_55px_-32px_rgba(15,23,42,0.35)] md:-mt-12">
-          <div className="grid md:grid-cols-3 xl:grid-cols-6">
+        <div className="relative z-10 -mt-8 overflow-hidden rounded-[22px] border border-stone-200/80 bg-white shadow-[0_22px_55px_-32px_rgba(15,23,42,0.35)] sm:-mt-10 md:-mt-12">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
             {highlightItems.map((item) => (
               <div
                 key={item.label}
-                className="flex min-h-[104px] items-center gap-4 border-b border-stone-200 px-6 py-5 transition hover:bg-stone-50/50 md:border-b-0 md:border-r last:border-b-0 xl:px-7"
+                className="flex min-h-[88px] items-center gap-3 border-b border-stone-200 px-4 py-4 transition hover:bg-stone-50/50 odd:border-r md:min-h-[104px] md:gap-4 md:px-6 md:py-5 md:odd:border-r-0 md:border-b-0 md:border-r last:border-b-0 xl:px-7"
               >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-200/80 bg-amber-50 text-[#d3a24c]">
-                  <item.icon className="h-[18px] w-[18px]" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-200/80 bg-amber-50 text-[#d3a24c] md:h-11 md:w-11">
+                  <item.icon className="h-4 w-4 md:h-[18px] md:w-[18px]" />
                 </div>
                 <div>
-                  <div className="text-[1.3rem] font-bold leading-[0.98] tracking-[-0.025em] text-stone-900">
+                  <div className="text-[1.05rem] font-bold leading-[0.98] tracking-[-0.025em] text-stone-900 md:text-[1.3rem]">
                     {item.title}
                   </div>
-                  <div className="mt-1.5 text-[12px] font-medium leading-[1.35] tracking-[0.01em] text-stone-500">
+                  <div className="mt-1 text-[10px] font-medium leading-[1.3] tracking-[0.01em] text-stone-500 md:mt-1.5 md:text-[12px]">
                     {item.label}
                   </div>
                 </div>
@@ -155,7 +155,7 @@ export function WhyChooseSection() {
   ];
 
   return (
-    <section className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,#fff_0%,#fffaf3_100%)] pb-12 pt-6 sm:pb-16 lg:pb-20">
+    <section className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,#fff_0%,#fffaf3_100%)] pb-6 pt-6 sm:pb-8 lg:pb-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mt-10 grid gap-6 lg:mt-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
           <div className="relative overflow-hidden rounded-[10px] border border-stone-200 bg-white shadow-[0_16px_40px_-34px_rgba(15,23,42,0.22)]">
@@ -177,18 +177,18 @@ export function WhyChooseSection() {
               Why Industries Trust SS Packaging?
             </h2>
 
-            <div className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-x-8 sm:grid-cols-2">
               {reasons.map((reason) => (
                 <div key={reason} className="flex items-start gap-2.5">
                   <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-amber-500">
                     <CheckCircle2 className="h-[11px] w-[11px]" />
                   </div>
-                  <p className="text-[14px] font-medium leading-[1.5] text-stone-700">{reason}</p>
+                  <p className="text-[13px] font-medium leading-[1.45] text-stone-700 sm:text-[14px]">{reason}</p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-7">
+            <div className="mt-7 flex justify-center sm:block">
               <Link
                 href="/contact#quote"
                 className="inline-flex items-center justify-center gap-2 rounded-[4px] bg-[#08111f] px-6 py-3 text-[13px] font-bold uppercase tracking-[0.03em] text-white transition hover:bg-[#12243c]"

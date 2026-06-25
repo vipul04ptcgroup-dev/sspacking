@@ -28,7 +28,7 @@ export default function ProcessAboutSection() {
   ];
 
   return (
-    <section className="bg-white py-12 sm:py-14 lg:py-16">
+    <section className="bg-white pb-12 pt-4 sm:pb-14 sm:pt-6 lg:pb-16 lg:pt-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
@@ -38,16 +38,16 @@ export default function ProcessAboutSection() {
 
         <div className="relative mt-6">
           <div className="absolute left-0 right-0 top-8 hidden border-t border-dashed border-stone-300 lg:block" />
-          <div className="grid gap-6 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6">
             {steps.map((step, index) => (
               <div key={step.label} className="relative flex flex-col items-center text-center">
                 <div className="absolute left-1/2 top-12 hidden h-7 w-7 -translate-x-[62px] items-center justify-center rounded-full bg-[#08111f] text-xs font-bold text-white lg:flex">
                   {index + 1}
                 </div>
-                <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-[#08111f] shadow-sm">
-                  <step.icon className="h-7 w-7" />
+                <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-[#08111f] shadow-sm sm:h-16 sm:w-16">
+                  <step.icon className="h-6 w-6 sm:h-7 sm:w-7" />
                 </div>
-                <p className="mt-4 whitespace-pre-line text-base font-semibold leading-6 text-stone-800">
+                <p className="mt-3 whitespace-pre-line text-[15px] font-semibold leading-6 text-stone-800 sm:mt-4 sm:text-base">
                   {step.label}
                 </p>
               </div>
@@ -56,16 +56,16 @@ export default function ProcessAboutSection() {
         </div>
 
         <div className="mt-10 overflow-hidden rounded-[14px] bg-[#08111f] text-white shadow-[0_24px_60px_-42px_rgba(2,6,23,0.6)]">
-          <div className="grid md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-2 xl:grid-cols-5">
             {stats.map((stat) => (
               <div
                 key={stat.label}
-                className="border-b border-white/15 px-6 py-6 text-center md:border-r md:border-b-0 last:border-r-0"
+                className="border-b border-white/15 px-4 py-5 text-center odd:border-r xl:border-r xl:border-b-0 xl:odd:border-r last:border-r-0 sm:px-6 sm:py-6"
               >
-                <div className="text-[3rem] font-black leading-none tracking-[-0.04em] text-white">
+                <div className="text-[2.35rem] font-black leading-none tracking-[-0.04em] text-white sm:text-[3rem]">
                   {stat.value}
                 </div>
-                <div className="mt-2 text-sm font-medium text-stone-300">{stat.label}</div>
+                <div className="mt-2 text-[12px] font-medium leading-[1.35] text-stone-300 sm:text-sm">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -95,7 +95,7 @@ export default function ProcessAboutSection() {
             <p className="mt-5 max-w-xl text-base leading-8 text-stone-600">
               SS Packaging is a trusted manufacturer and supplier of premium packaging solutions designed for cosmetic, pharmaceutical, food, FMCG and industrial applications. We provide high-quality bottles, jars, containers and closures with custom manufacturing capabilities.
             </p>
-            <div className="mt-7">
+            <div className="mt-7 flex justify-center sm:block">
               <Link
                 href="/about"
                 className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-[#08111f] px-6 py-3 text-sm font-bold uppercase tracking-[0.03em] text-white transition hover:bg-[#12243c]"

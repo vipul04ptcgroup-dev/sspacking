@@ -33,23 +33,24 @@ export default function ClientTrustSection() {
           </p>
         </div>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-3">
+        <div className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:pb-0">
           {testimonials.map((item) => (
-            <article
-              key={item.name}
-              className="rounded-[14px] border border-stone-200 bg-white px-7 py-6 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.22)]"
-            >
-              <div className="flex items-center gap-1 text-amber-500">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Star key={index} className="h-4 w-4 fill-current" />
-                ))}
-              </div>
-              <p className="mt-4 text-[17px] leading-8 text-stone-600">{item.quote}</p>
-              <div className="mt-6">
-                <p className="text-base font-bold text-[#08111f]">- {item.name}</p>
-                <p className="mt-1 text-sm font-medium text-stone-500">{item.title}</p>
-              </div>
-            </article>
+            <div key={item.name} className="min-w-[88%] snap-center sm:min-w-[70%] lg:min-w-0">
+              <article className="rounded-[14px] border border-stone-200 bg-white px-5 py-5 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.22)] sm:px-7 sm:py-6">
+                <div className="flex items-center gap-1 text-amber-500">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <Star key={index} className="h-4 w-4 fill-current" />
+                  ))}
+                </div>
+                <p className="mt-4 text-[15px] leading-7 text-stone-600 sm:text-[17px] sm:leading-8">
+                  {item.quote}
+                </p>
+                <div className="mt-6">
+                  <p className="text-base font-bold text-[#08111f]">- {item.name}</p>
+                  <p className="mt-1 text-sm font-medium text-stone-500">{item.title}</p>
+                </div>
+              </article>
+            </div>
           ))}
         </div>
 

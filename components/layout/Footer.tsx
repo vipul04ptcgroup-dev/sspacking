@@ -1,11 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Phone, Mail, MapPin, Share2, Globe, Send } from 'lucide-react';
- 
+import { Phone, Mail, MapPin, Share2, Globe, Send, ChevronDown } from 'lucide-react';
+
+const quickLinks = [
+  { label: 'Home', href: '/' },
+  { label: 'Products', href: '/products' },
+  { label: 'About Us', href: '/about' },
+  { label: 'Contact', href: '/contact' },
+  { label: 'Get a Quote', href: '/contact#quote' },
+];
 
 export default function Footer() {
+  const [openSection, setOpenSection] = useState<string | null>(null);
+
+  const toggleSection = (section: string) => {
+    setOpenSection((current) => (current === section ? null : section));
+  };
+
   return (
     <footer className="bg-stone-900 text-stone-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 sm:pt-16 pb-8">
@@ -28,17 +42,11 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div className="lg:col-span-3 text-center sm:text-left">
+          {/* Desktop Quick Links */}
+          <div className="hidden sm:block lg:col-span-3 text-center sm:text-left">
             <h4 className="text-white font-semibold mb-4">Quick Links</h4>
             <ul className="space-y-2.5">
-              {[
-                { label: 'Home', href: '/' },
-                { label: 'Products', href: '/products' },
-                { label: 'About Us', href: '/about' },
-                { label: 'Contact', href: '/contact' },
-                { label: 'Get a Quote', href: '/contact#quote' },
-              ].map((link) => (
+              {quickLinks.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm text-stone-400 hover:text-amber-400 transition-colors">
                     {link.label}
@@ -48,8 +56,8 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
-          <div className="lg:col-span-4 text-center sm:text-left">
+          {/* Desktop Contact */}
+          <div className="hidden sm:block lg:col-span-4 text-center sm:text-left">
             <h4 className="text-white font-semibold mb-4">Contact Us</h4>
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5 text-sm text-stone-400">
@@ -73,6 +81,98 @@ export default function Footer() {
               <p className="text-xs text-stone-400 mb-1">Business Hours</p>
               <p className="text-sm text-white">Mon - Sat: 9:00 AM - 6:00 PM</p>
             </div>
+          </div>
+        </div>
+
+        {/* Mobile accordion */}
+        <div className="sm:hidden mb-10 border-t border-stone-800">
+          <div className="border-b border-stone-800">
+            <button
+              type="button"
+              onClick={() => toggleSection('quick-links')}
+              className="flex w-full items-center justify-between py-4 text-left"
+            >
+              <span className="text-sm font-semibold uppercase tracking-[0.18em] text-white">Quick Links</span>
+              <ChevronDown
+                className={`h-4 w-4 text-stone-300 transition-transform ${openSection === 'quick-links' ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {openSection === 'quick-links' && (
+              <ul className="space-y-3 pb-4">
+                {quickLinks.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="block text-sm text-stone-400 transition-colors hover:text-amber-400"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="border-b border-stone-800">
+            <button
+              type="button"
+              onClick={() => toggleSection('contact')}
+              className="flex w-full items-center justify-between py-4 text-left"
+            >
+              <span className="text-sm font-semibold uppercase tracking-[0.18em] text-white">Contact Us</span>
+              <ChevronDown
+                className={`h-4 w-4 text-stone-300 transition-transform ${openSection === 'contact' ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {openSection === 'contact' && (
+              <ul className="space-y-3 pb-4">
+                <li className="flex items-start gap-2.5 text-sm leading-6 text-stone-400">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  Office no. 201-202, Hirubhai Residency Besides Vedant Hospital, Virar (West) - 401303 Maharashtra,
+                  India.
+                </li>
+                <li className="flex items-start gap-2.5 text-sm leading-6 text-stone-400">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  Unit no. 13, Pragati Compound, Dongri Pada Road, near Jain Mandir, Poman, Vasai Bhiwandi Road,
+                  Vasai East, Palghar - 401208
+                </li>
+                <li className="flex items-center gap-2.5 text-sm text-stone-400">
+                  <Phone className="h-4 w-4 shrink-0 text-amber-500" />
+                  <a href="tel:+919120879879" className="transition hover:text-amber-400">
+                    +91 91208 79879
+                  </a>
+                </li>
+                <li className="flex items-center gap-2.5 text-sm text-stone-400">
+                  <Mail className="h-4 w-4 shrink-0 text-amber-500" />
+                  <a
+                    href="mailto:customerservice.sspackaging@gmail.com"
+                    className="break-all transition hover:text-amber-400"
+                  >
+                    customerservice.sspackaging@gmail.com
+                  </a>
+                </li>
+              </ul>
+            )}
+          </div>
+
+          <div className="border-b border-stone-800">
+            <button
+              type="button"
+              onClick={() => toggleSection('hours')}
+              className="flex w-full items-center justify-between py-4 text-left"
+            >
+              <span className="text-sm font-semibold uppercase tracking-[0.18em] text-white">Business Hours</span>
+              <ChevronDown
+                className={`h-4 w-4 text-stone-300 transition-transform ${openSection === 'hours' ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {openSection === 'hours' && (
+              <div className="pb-4">
+                <div className="rounded-xl bg-stone-800 px-4 py-3">
+                  <p className="text-sm text-white">Mon - Sat: 9:00 AM - 6:00 PM</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
