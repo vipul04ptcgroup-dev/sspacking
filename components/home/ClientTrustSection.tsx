@@ -53,7 +53,7 @@ export default function ClientTrustSection() {
           ))}
         </div>
 
-        <div className="mt-8 text-center">
+        {/* <div className="mt-8 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
             Trusted By Leading Brands
           </p>
@@ -68,7 +68,8 @@ export default function ClientTrustSection() {
               <span className="text-lg font-bold tracking-[-0.02em] text-stone-700">{brand}</span>
             </div>
           ))}
-        </div>
+        </div> */}
+
       </div>
     </section>
   );

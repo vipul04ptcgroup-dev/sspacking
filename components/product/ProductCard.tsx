@@ -17,8 +17,6 @@ export default function ProductCard({ product }: ProductCardProps) {
     if (!lowest || tier.unitPrice < lowest.unitPrice) return tier;
     return lowest;
   }, null);
-  const hasPrice = Boolean(lowestTier);
-  const isOutOfStock = product.stockQuantity <= 0;
 
   const previewImage = product.images?.[0] || '';
   const publicCategory = resolveProductPublicCategory(product);
@@ -45,11 +43,11 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
           )}
           {product.featured && (
-            <div className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+            <div className="absolute left-3 top-3 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
               Featured
             </div>
           )}
-          <div className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+          <div className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide shadow-sm ${
             product.stockStatus === 'out_of_stock'
               ? 'bg-red-100 text-red-700'
               : product.stockStatus === 'low_stock'
@@ -67,27 +65,19 @@ export default function ProductCard({ product }: ProductCardProps) {
       </Link>
 
       <div className="space-y-4 p-4">
-        <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-600">
-            {publicCategory.name}
-          </p>
-          <Link href={productUrl} className="block">
-            <h3 className="text-base font-black leading-snug text-stone-900 transition group-hover:text-amber-700 line-clamp-2">
-              {product.name}
-            </h3>
-          </Link>
-        </div>
+        <Link href={productUrl} className="block">
+          <h3 className="text-base font-black leading-snug text-stone-900 transition group-hover:text-amber-700 line-clamp-2">
+            {product.name}
+          </h3>
+        </Link>
 
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            {hasPrice && lowestTier ? (
+            {lowestTier ? (
               <p className="text-2xl font-black leading-none text-stone-950">{formatPrice(lowestTier.unitPrice)}</p>
             ) : (
               <p className="text-lg font-bold text-stone-500">Price on request</p>
             )}
-            <p className={`mt-1 text-[11px] font-medium ${isOutOfStock ? 'text-red-500' : 'text-stone-400'}`}>
-              {isOutOfStock ? 'Currently unavailable' : 'Request bulk pricing'}
-            </p>
           </div>
           <Link
             href={enquiryUrl}
