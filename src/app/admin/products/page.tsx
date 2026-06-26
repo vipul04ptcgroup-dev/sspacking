@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { backfillProductStockFields, getAllProducts, deleteProduct, updateProduct, getAllCategories } from '@/lib/firestore';
-import { formatQuantityWithUnit, getProductUnitLabel } from '@/lib/product-units';
+import { getProductUnitLabel } from '@/lib/product-units';
 import { useAuth } from '@/context/auth-context';
 import type { Product, Category } from '@/types';
 import { formatPrice } from '@/lib/utils';
@@ -12,6 +12,14 @@ import Button from '@/components/ui/Button';
 import { Spinner, EmptyState } from '@/components/ui';
 import { Plus, Pencil, Trash2, Package, Eye, EyeOff, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+function getAdminProductsDisplayUnit(product: Pick<Product, 'unit' | 'categoryId'>): string {
+  return product.unit === 'gram' ? 'PCS' : getProductUnitLabel(product.unit);
+}
+
+function formatAdminProductsStock(product: Pick<Product, 'stockQuantity' | 'unit' | 'categoryId'>): string {
+  return `${product.stockQuantity} ${getAdminProductsDisplayUnit(product)}`;
+}
 
 export default function AdminProductsPage() {
   const { user } = useAuth();
@@ -304,8 +312,8 @@ export default function AdminProductsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-stone-600">{product.categoryId}</td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{getProductUnitLabel(product.unit)}</td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{formatQuantityWithUnit(product.stockQuantity, product.unit)}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{getAdminProductsDisplayUnit(product)}</td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{formatAdminProductsStock(product)}</td>
                       <td className="px-4 py-3 text-sm font-bold text-stone-900">{formatPrice(minPrice)}</td>
                       <td className="px-4 py-3 text-sm text-stone-600">{product.pricingTiers.length}</td>
                       <td className="px-4 py-3">

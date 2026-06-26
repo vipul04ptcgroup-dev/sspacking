@@ -71,7 +71,7 @@ export default function ClientTrustSection() {
           ))}
         </div> */}
 
-      </div>
+      </div>    
     </section>
   );
 }

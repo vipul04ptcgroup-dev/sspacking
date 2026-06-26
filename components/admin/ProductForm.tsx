@@ -180,6 +180,7 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
   const isProductionCategory = isProductionProductCategorySlug(selectedCategoryId || initialData?.categoryId || 'finished');
   const derivedUnit = getProductUnitForCategory(selectedCategoryId || initialData?.categoryId || 'finished');
   const derivedUnitLabel = getProductUnitLabel(derivedUnit);
+  const derivedUnitUiLabel = derivedUnit === 'gram' ? 'PCS' : derivedUnitLabel;
 
   const toImageList = (value?: string) =>
     value ? value.split(',').map((img) => img.trim()).filter(Boolean) : [];
@@ -364,11 +365,11 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
 
           <Input label="Tags (comma-separated)" id="tags" placeholder="bamboo, eco, bottle" {...register('tags')} className="sm:col-span-2" />
           <Input label="SKU *" id="sku" placeholder="SKU-001" error={errors.sku?.message} {...register('sku')} />
-          <Input label="Inventory Unit" value={derivedUnitLabel} readOnly className="bg-stone-50" />
-          <Input label={`Stock Quantity (${derivedUnitLabel}) *`} id="stockQuantity" type="number" min={0} error={errors.stockQuantity?.message} {...register('stockQuantity')} />
-          <Input label={`Low Stock Limit (${derivedUnitLabel}) *`} id="lowStockLimit" type="number" min={0} error={errors.lowStockLimit?.message} {...register('lowStockLimit')} />
+          <Input label="Inventory Unit" value={derivedUnitUiLabel} readOnly className="bg-stone-50" />
+          <Input label={`Stock Quantity (${derivedUnitUiLabel}) *`} id="stockQuantity" type="number" min={0} error={errors.stockQuantity?.message} {...register('stockQuantity')} />
+          <Input label={`Low Stock Limit (${derivedUnitUiLabel}) *`} id="lowStockLimit" type="number" min={0} error={errors.lowStockLimit?.message} {...register('lowStockLimit')} />
           <p className="text-xs text-stone-500 sm:col-span-2">
-            Stock is stored automatically in {derivedUnitLabel} based on the selected category. Manual unit changes are disabled.
+            Stock is stored automatically in {derivedUnitUiLabel} based on the selected category. Manual unit changes are disabled.
           </p>
           <div className="flex items-center gap-6 sm:col-span-2">
             <label className="flex cursor-pointer items-center gap-2">
@@ -393,7 +394,7 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
           <Input label="Capacity" {...register('capacity')} error={errors.capacity?.message} />
           <Input label="Neck Size" {...register('neckSize')} error={errors.neckSize?.message} />
           <Input label="Height" {...register('height')} error={errors.height?.message} />
-          <Input label={`Weight (${derivedUnitLabel})`} {...register('weight')} error={errors.weight?.message} />
+          <Input label={`Weight (${derivedUnitUiLabel})`} {...register('weight')} error={errors.weight?.message} />
           <Input label="Material" {...register('material')} error={errors.material?.message} />
           <Input label="Packaging Size" {...register('packagingSize')} error={errors.packagingSize?.message} />
           <Input label="Color" {...register('color')} error={errors.color?.message} />
