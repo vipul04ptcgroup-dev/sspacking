@@ -17,6 +17,11 @@ export async function uploadCategoryImage(file: File, categoryId: string): Promi
   return uploadImage(file, `categories/${categoryId}/${filename}`);
 }
 
+export async function uploadBlogImage(file: File, blogId: string): Promise<string> {
+  const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  return uploadImage(file, `blogs/${blogId}/${filename}`);
+}
+
 export async function uploadDeliveryChallanImage(
   file: File,
   challanRef: string,

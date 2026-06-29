@@ -1,12 +1,13 @@
 import Link from 'next/link';
-import Image from 'next/image';
-import { ArrowRight, Package2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { getCategories } from '@/lib/firestore';
+import CategoryCardsGrid from '@/components/home/CategoryCardsGrid';
 
 export default async function CategoryGrid() {
   const categories = await getCategories().catch(() => []);
+  const featuredCategories = categories.slice(0, 6);
 
-  if (!categories.length) return null;
+  if (!featuredCategories.length) return null;
 
   return (
     <section className="bg-white py-10 sm:py-12 lg:py-14">
@@ -21,50 +22,15 @@ export default async function CategoryGrid() {
           <div className="mx-auto mt-3 h-[3px] w-16 rounded-full bg-amber-300" />
         </div>
 
-        <div
-          className="mt-8 flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-3 lg:gap-6 lg:overflow-visible"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
-          {categories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/products/${cat.slug}`}
-              className="group relative min-w-[280px] overflow-hidden rounded-[10px] border border-stone-200 bg-white shadow-[0_16px_40px_-34px_rgba(15,23,42,0.28)] transition-all duration-300 hover:-translate-y-1 hover:border-amber-200 hover:shadow-[0_24px_60px_-40px_rgba(217,119,6,0.22)] lg:min-w-0"
-            >
-              <div className="relative min-h-[260px] sm:min-h-[250px] lg:min-h-[285px] overflow-hidden bg-[linear-gradient(145deg,#f8f5ef_0%,#ffffff_52%,#eef2f6_100%)]">
-                {cat.image ? (
-                  <Image
-                    src={cat.image}
-                    alt={cat.name}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 1024px) 280px, 33vw"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <div className="rounded-[2rem] border border-white/80 bg-white/80 px-10 py-8 shadow-sm backdrop-blur">
-                      <Package2 className="h-16 w-16 text-stone-400" />
-                    </div>
-                  </div>
-                )}
-                <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/88 to-transparent" />
-              </div>
+        <CategoryCardsGrid categories={featuredCategories} />
 
-              <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-[8px] border border-stone-200 bg-white px-2.5 py-2 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.25)] sm:inset-x-4 sm:bottom-4 sm:gap-2.5 sm:px-3 sm:py-2.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0f172a] text-white sm:h-10 sm:w-10">
-                  <Package2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-[12px] font-bold leading-tight text-stone-900 sm:text-sm">
-                    {cat.name}
-                  </h3>
-                </div>
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-amber-300 text-amber-500 transition group-hover:bg-amber-50 sm:h-7 sm:w-7">
-                  <ArrowRight className="h-3 w-3 sm:h-[13px] sm:w-[13px]" />
-                </div>
-              </div>
-            </Link>
-          ))}
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="/categories"
+            className="inline-flex items-center justify-center gap-2 rounded-[4px] bg-[#08111f] px-6 py-3 text-[13px] font-bold uppercase tracking-[0.03em] text-white transition hover:bg-[#12243c]"
+          >
+            View All Categories <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
     </section>

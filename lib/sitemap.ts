@@ -1,4 +1,4 @@
-import { getCategories, getProducts } from '@/lib/firestore';
+import { getCategories, getProducts, getPublishedBlogPosts } from '@/lib/firestore';
 import { SITE_URL } from '@/lib/seo';
 
 export type SitemapEntry = {
@@ -11,7 +11,9 @@ export type SitemapEntry = {
 
 const publicStaticRoutes: Array<Omit<SitemapEntry, 'url' | 'lastModified'>> = [
   { path: '/', changeFrequency: 'weekly', priority: 1 },
+  { path: '/categories', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/products', changeFrequency: 'weekly', priority: 0.95 },
+  { path: '/blogs', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.4 },
@@ -40,7 +42,7 @@ export async function getAllSitemapEntries(): Promise<SitemapEntry[]> {
   }));
 
   try {
-    const [categories, products] = await Promise.all([getCategories(), getProducts()]);
+    const [categories, products, blogs] = await Promise.all([getCategories(), getProducts(), getPublishedBlogPosts()]);
 
     const categoryEntries: SitemapEntry[] = categories
       .filter(c => Boolean(c?.slug))
@@ -65,8 +67,21 @@ export async function getAllSitemapEntries(): Promise<SitemapEntry[]> {
         };
       });
 
+    const blogEntries: SitemapEntry[] = blogs
+      .filter((blog) => Boolean(blog?.slug))
+      .map((blog) => {
+        const path = `/blogs/${safeSegment(blog.slug)}`;
+        return {
+          path,
+          url: toAbsolute(path),
+          lastModified: blog.updatedAt || blog.publishedAt || blog.createdAt || now,
+          changeFrequency: 'monthly',
+          priority: blog.featured ? 0.78 : 0.72,
+        } satisfies SitemapEntry;
+      });
+
     const deduped = new Map<string, SitemapEntry>();
-    [...staticEntries, ...categoryEntries, ...productEntries].forEach(entry => {
+    [...staticEntries, ...categoryEntries, ...productEntries, ...blogEntries].forEach(entry => {
       deduped.set(entry.url, entry);
     });
 

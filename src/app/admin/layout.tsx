@@ -7,7 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import { Spinner } from '@/components/ui';
 import {
   LayoutDashboard, Package, ShoppingBag, Tags, Users, MessageSquare,
-  ArrowLeft, Menu, FileText, Boxes, ReceiptText, History, ShieldUser, ClipboardList, Building2, Factory, BarChart3,
+  ArrowLeft, Menu, FileText, Boxes, ReceiptText, History, ShieldUser, ClipboardList, Building2, Factory, BarChart3, NotebookPen,
 } from 'lucide-react';
 
 const navSections = [
@@ -45,6 +45,7 @@ const navSections = [
   {
     title: 'Engagement',
     items: [
+      { icon: NotebookPen, label: 'Blogs', href: '/admin/blogs' },
       { icon: MessageSquare, label: 'Quote Requests', href: '/admin/quotes' },
     ],
   },

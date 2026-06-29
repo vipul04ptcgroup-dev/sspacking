@@ -12,8 +12,11 @@ import {
 } from './product-categories';
 import { normalizePublicCategoryName, normalizePublicCategorySlug, resolveProductPublicCategory } from './public-product-categories';
 import { getProductUnitForCategory } from './product-units';
+import { slugify } from './utils';
 import type {
   Address,
+  BlogInternalLink,
+  BlogPost,
   Product,
   Category,
   Order,
@@ -112,6 +115,10 @@ function sanitizeLowStockLimit(value: unknown, fallback = DEFAULT_LOW_STOCK_LIMI
 
 function sanitizeOptionalText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function sanitizeLongText(value: unknown): string {
+  return typeof value === 'string' ? value.replace(/\r\n/g, '\n').trim() : '';
 }
 
 function sanitizePricingValue(value: unknown): number | null {
@@ -573,6 +580,89 @@ function normalizeStockTransaction(id: string, data: Record<string, unknown>): S
     quantity: sanitizeStockValue(data.quantity),
     transactionType: (data.transactionType as StockTransaction['transactionType']) || 'IN',
     createdAt: toDateOrNow(data.createdAt),
+  };
+}
+
+function normalizeBlogInternalLinks(value: unknown): BlogInternalLink[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      const record = item as Record<string, unknown>;
+      const label = sanitizeOptionalText(record.label);
+      const href = sanitizeOptionalText(record.href);
+      const type = sanitizeOptionalText(record.type) as BlogInternalLink['type'];
+
+      if (!label || !href) return null;
+
+      return {
+        label,
+        href,
+        type: ['page', 'category', 'product', 'blog', 'custom'].includes(type) ? type : 'custom',
+      } satisfies BlogInternalLink;
+    })
+    .filter((item): item is BlogInternalLink => item !== null);
+}
+
+function sanitizeBlogWriteData(data: Partial<BlogPost>) {
+  const title = typeof data.title === 'string' ? sanitizeOptionalText(data.title) : '';
+  const excerpt = typeof data.excerpt === 'string' ? sanitizeLongText(data.excerpt) : '';
+
+  return {
+    ...(title ? { title } : {}),
+    ...(typeof data.slug === 'string'
+      ? { slug: slugify(data.slug) || slugify(title) }
+      : title
+        ? { slug: slugify(title) }
+        : {}),
+    ...(typeof data.excerpt === 'string' ? { excerpt } : {}),
+    ...(typeof data.content === 'string' ? { content: sanitizeLongText(data.content) } : {}),
+    ...(typeof data.coverImage === 'string' ? { coverImage: sanitizeOptionalText(data.coverImage) } : {}),
+    ...(Array.isArray(data.tags)
+      ? {
+          tags: data.tags
+            .filter((tag) => typeof tag === 'string')
+            .map((tag) => sanitizeOptionalText(tag))
+            .filter(Boolean),
+        }
+      : {}),
+    ...(typeof data.published === 'boolean' ? { published: data.published } : {}),
+    ...(typeof data.featured === 'boolean' ? { featured: data.featured } : {}),
+    ...(typeof data.authorName === 'string' ? { authorName: sanitizeOptionalText(data.authorName) } : {}),
+    ...(typeof data.seoTitle === 'string' ? { seoTitle: sanitizeOptionalText(data.seoTitle) } : {}),
+    ...(typeof data.seoDescription === 'string' ? { seoDescription: sanitizeLongText(data.seoDescription) } : {}),
+    ...(Array.isArray(data.internalLinks) ? { internalLinks: normalizeBlogInternalLinks(data.internalLinks) } : {}),
+    ...(typeof data.createdBy === 'string' ? { createdBy: sanitizeOptionalText(data.createdBy) } : {}),
+    ...('publishedAt' in data
+      ? {
+          publishedAt: data.publishedAt ?? null,
+        }
+      : {}),
+  };
+}
+
+function normalizeBlogPost(id: string, data: Record<string, unknown>): BlogPost {
+  const title = sanitizeOptionalText(data.title);
+  const excerpt = sanitizeLongText(data.excerpt);
+
+  return {
+    id,
+    title,
+    slug: sanitizeOptionalText(data.slug) || slugify(title),
+    excerpt,
+    content: sanitizeLongText(data.content),
+    coverImage: sanitizeOptionalText(data.coverImage),
+    tags: Array.isArray(data.tags) ? (data.tags as string[]).map((tag) => sanitizeOptionalText(tag)).filter(Boolean) : [],
+    published: Boolean(data.published),
+    featured: Boolean(data.featured),
+    authorName: sanitizeOptionalText(data.authorName) || 'SS Packaging',
+    seoTitle: sanitizeOptionalText(data.seoTitle) || title,
+    seoDescription: sanitizeLongText(data.seoDescription) || excerpt,
+    internalLinks: normalizeBlogInternalLinks(data.internalLinks),
+    createdBy: sanitizeOptionalText(data.createdBy),
+    createdAt: toDateOrNow(data.createdAt),
+    updatedAt: toDateOrNow(data.updatedAt),
+    publishedAt: toDateOrNull(data.publishedAt),
   };
 }
 
@@ -3070,6 +3160,142 @@ export async function getTeamAccessLogs(maxEntries = 200): Promise<TeamAccessLog
   const q = query(collection(db, 'teamAccessLogs'), orderBy('createdAt', 'desc'), limit(maxEntries));
   const snap = await getDocs(q);
   return snap.docs.map((docSnap) => normalizeTeamAccessLog(docSnap.id, docSnap.data()));
+}
+
+// ─── Blogs ────────────────────────────────────────────────────────────────────
+
+export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
+  const q = query(collection(db, 'blogs'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((docSnap) => normalizeBlogPost(docSnap.id, docSnap.data()))
+    .filter((post) => post.published)
+    .sort((left, right) => {
+      const leftTime = (left.publishedAt || left.createdAt).getTime();
+      const rightTime = (right.publishedAt || right.createdAt).getTime();
+      return rightTime - leftTime;
+    });
+}
+
+export async function getFeaturedBlogPosts(maxEntries = 3): Promise<BlogPost[]> {
+  const posts = await getPublishedBlogPosts();
+  return posts.filter((post) => post.featured).slice(0, maxEntries);
+}
+
+export async function getAllBlogPosts(): Promise<BlogPost[]> {
+  const q = query(collection(db, 'blogs'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((docSnap) => normalizeBlogPost(docSnap.id, docSnap.data()))
+    .sort((left, right) => {
+      const leftTime = (left.publishedAt || left.createdAt).getTime();
+      const rightTime = (right.publishedAt || right.createdAt).getTime();
+      return rightTime - leftTime;
+    });
+}
+
+export async function getBlogPostById(id: string): Promise<BlogPost | null> {
+  const snap = await getDoc(doc(db, 'blogs', id));
+  if (!snap.exists()) return null;
+  return normalizeBlogPost(snap.id, snap.data() as Record<string, unknown>);
+}
+
+export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
+  const normalizedSlug = slugify(slug);
+  const q = query(collection(db, 'blogs'), where('slug', '==', normalizedSlug), limit(1));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return normalizeBlogPost(snap.docs[0].id, snap.docs[0].data());
+}
+
+export async function createBlogPost(
+  data: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>,
+  actor?: string | AdminActivityActor,
+): Promise<string> {
+  const payload = sanitizeBlogWriteData(data);
+  const title = payload.title || 'Untitled blog';
+  const publishedAt = payload.published ? payload.publishedAt || serverTimestamp() : null;
+
+  const ref = await addDoc(collection(db, 'blogs'), {
+    ...payload,
+    title,
+    slug: payload.slug || slugify(title),
+    excerpt: payload.excerpt || '',
+    content: payload.content || '',
+    coverImage: payload.coverImage || '',
+    tags: payload.tags || [],
+    featured: payload.featured || false,
+    published: payload.published || false,
+    authorName: payload.authorName || 'SS Packaging',
+    seoTitle: payload.seoTitle || title,
+    seoDescription: payload.seoDescription || payload.excerpt || '',
+    internalLinks: payload.internalLinks || [],
+    createdBy: payload.createdBy || (typeof actor === 'string' ? actor : actor?.email || actor?.uid || 'admin'),
+    publishedAt,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await logAdminActivity({
+    action: 'create',
+    entity: 'blog',
+    entityId: ref.id,
+    entityLabel: title,
+    message: `Created blog "${title}"`,
+    actor,
+    metadata: {
+      slug: payload.slug || slugify(title),
+      published: Boolean(payload.published),
+    },
+  });
+
+  return ref.id;
+}
+
+export async function updateBlogPost(
+  id: string,
+  data: Partial<BlogPost>,
+  actor?: string | AdminActivityActor,
+): Promise<void> {
+  const payload = sanitizeBlogWriteData(data);
+  const existing = await getBlogPostById(id);
+  const shouldSetPublishedAt = typeof data.published === 'boolean' && data.published && !existing?.publishedAt;
+  const shouldClearPublishedAt = typeof data.published === 'boolean' && !data.published;
+
+  await updateDoc(doc(db, 'blogs', id), {
+    ...payload,
+    ...(shouldSetPublishedAt ? { publishedAt: serverTimestamp() } : {}),
+    ...(shouldClearPublishedAt ? { publishedAt: null } : {}),
+    updatedAt: serverTimestamp(),
+  });
+
+  await logAdminActivity({
+    action: 'update',
+    entity: 'blog',
+    entityId: id,
+    entityLabel: data.title || existing?.title || id,
+    message: `Updated blog "${data.title || existing?.title || id}"`,
+    actor,
+    metadata: {
+      updatedFields: Object.keys(data).join(', ') || 'none',
+      published: typeof data.published === 'boolean' ? data.published : existing?.published ?? false,
+    },
+  });
+}
+
+export async function deleteBlogPost(id: string, actor?: string | AdminActivityActor): Promise<void> {
+  const existing = await getDoc(doc(db, 'blogs', id));
+  const postTitle = existing.exists() ? sanitizeOptionalText(existing.data().title) || id : id;
+  await deleteDoc(doc(db, 'blogs', id));
+
+  await logAdminActivity({
+    action: 'delete',
+    entity: 'blog',
+    entityId: id,
+    entityLabel: postTitle,
+    message: `Deleted blog "${postTitle}"`,
+    actor,
+  });
 }
 
 // ─── Quotes ───────────────────────────────────────────────────────────────────

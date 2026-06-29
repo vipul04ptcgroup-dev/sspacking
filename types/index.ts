@@ -241,6 +241,34 @@ export interface QuoteRequest {
   createdAt: Date;
 }
 
+export type BlogInternalLinkType = 'page' | 'category' | 'product' | 'blog' | 'custom';
+
+export interface BlogInternalLink {
+  label: string;
+  href: string;
+  type: BlogInternalLinkType;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  coverImage: string;
+  tags: string[];
+  published: boolean;
+  featured: boolean;
+  authorName: string;
+  seoTitle: string;
+  seoDescription: string;
+  internalLinks: BlogInternalLink[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  publishedAt?: Date | null;
+}
+
 export interface InventoryTransaction {
   id: string;
   productId: string;
@@ -317,6 +345,7 @@ export type AdminActivityAction =
 export type AdminActivityEntity =
   | 'product'
   | 'category'
+  | 'blog'
   | 'order'
   | 'inventory'
   | 'supplier'
