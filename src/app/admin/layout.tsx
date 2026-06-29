@@ -7,7 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import { Spinner } from '@/components/ui';
 import {
   LayoutDashboard, Package, ShoppingBag, Tags, Users, MessageSquare,
-  ArrowLeft, Menu, FileText, Boxes, ReceiptText, History, ShieldUser, ClipboardList, Building2, Factory, BarChart3, NotebookPen,
+  ArrowLeft, Menu, FileText, Boxes, ReceiptText, History, ShieldUser, ClipboardList, Building2, Factory, BarChart3, NotebookPen, MapPinned,
 } from 'lucide-react';
 
 const navSections = [
@@ -59,6 +59,7 @@ const navSections = [
   {
     title: 'Systems',
     items: [
+      { icon: MapPinned, label: 'Location Analytics', href: '/admin/location-analytics' },
       { icon: History, label: 'Admin Logs', href: '/admin/logs' },
       { icon: ClipboardList, label: 'Team Logs', href: '/admin/team-logs' },
     ],

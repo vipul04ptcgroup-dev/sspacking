@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { ShoppingBag, Lock } from 'lucide-react';
 import Image from 'next/image';
+import { trackVisitorEvent } from '@/lib/visitor-analytics-client';
 
 const schema = z.object({
   fullName: z.string().min(2, 'Full name required'),
@@ -119,6 +120,11 @@ export default function CheckoutPage() {
         status: 'pending',
         paymentStatus: 'pending',
         paymentMethod: 'COD',
+      });
+      trackVisitorEvent({
+        eventType: 'checkout',
+        quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+        price: cartTotal + shippingCost,
       });
       clearCart();
       toast.success('Order placed successfully!');

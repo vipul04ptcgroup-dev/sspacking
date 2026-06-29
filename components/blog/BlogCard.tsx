@@ -31,14 +31,6 @@ export default function BlogCard({ blog }: { blog: BlogPost }) {
               Featured
             </span>
           ) : null}
-          {blog.tags.slice(0, 2).map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-600"
-            >
-              {tag}
-            </span>
-          ))}
         </div>
 
         <div className="mb-3 flex items-center gap-2 text-xs text-stone-500">

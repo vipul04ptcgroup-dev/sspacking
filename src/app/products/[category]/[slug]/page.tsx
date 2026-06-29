@@ -1,8 +1,10 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { serializeProductForClient } from '@/lib/client-serialization';
 import { getCategoryBySlug, getProductBySlug } from '@/lib/firestore';
 import ProductDetailPageClient from '@/components/product/ProductDetailPageClient';
 import { resolveProductPublicCategory } from '@/lib/public-product-categories';
+import { absoluteUrl } from '@/lib/seo';
 import { buildProductSchema } from '@/src/seo/productSchema';
 import { buildBreadcrumbSchema } from '@/src/seo/breadcrumbSchema';
 import { buildWebPageSchema } from '@/src/seo/webpageSchema';
@@ -42,6 +44,47 @@ function buildDescriptionBlocks(description: string): DescriptionBlock[] {
 
 void buildDescriptionBlocks;
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ category: string; slug: string }>;
+}): Promise<Metadata> {
+  const { category, slug } = await params;
+  const product = await getProductBySlug(slug);
+
+  if (!product || resolveProductPublicCategory(product).slug !== category) {
+    return {
+      title: 'Product Not Found',
+    };
+  }
+
+  const title = product.seoTitle || product.name;
+  const description = product.seoDescription || product.shortDescription || product.description;
+  const path = `/products/${category}/${slug}`;
+  const image = product.images?.[0];
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: absoluteUrl(path),
+    },
+    openGraph: {
+      title,
+      description,
+      url: absoluteUrl(path),
+      type: 'website',
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
+
 export default async function ProductDetailPage({
   params,
 }: {
@@ -56,6 +99,13 @@ export default async function ProductDetailPage({
   if (!product) return notFound();
   if (resolveProductPublicCategory(product).slug !== category) return notFound();
   const clientProduct = serializeProductForClient(product);
+  const keywordList = [
+    product.focusKeyword,
+    ...product.secondaryKeywords,
+    product.name,
+    product.sku,
+    ...(product.tags || []),
+  ].filter(Boolean);
 
   return (
     <>
@@ -64,9 +114,9 @@ export default async function ProductDetailPage({
         schemas={[
           buildWebPageSchema({
             path: `/products/${category}/${slug}`,
-            name: product.name,
-            description: product.shortDescription || product.description,
-            keywords: [product.name, product.sku, ...(product.tags || [])],
+            name: product.seoTitle || product.name,
+            description: product.seoDescription || product.shortDescription || product.description,
+            keywords: keywordList,
           }),
           buildProductSchema({
             path: `/products/${category}/${slug}`,

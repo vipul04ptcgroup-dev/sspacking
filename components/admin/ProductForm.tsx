@@ -33,6 +33,10 @@ const schema = z.object({
   publicCategorySlug: z.string().min(1, 'Public category slug required'),
   shortDescription: z.string().min(5, 'Short description required'),
   description: z.string().trim().min(1, 'Product description required'),
+  seoTitle: z.string().optional(),
+  seoDescription: z.string().optional(),
+  focusKeyword: z.string().optional(),
+  secondaryKeywords: z.string().optional(),
   images: z.string().optional(),
   tags: z.string().optional(),
   sku: z.string().min(1, 'SKU required'),
@@ -125,6 +129,10 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
           ...initialData,
           images: (initialData.images || []).join(', '),
           tags: initialData.tags.join(', '),
+          seoTitle: initialData.seoTitle || '',
+          seoDescription: initialData.seoDescription || '',
+          focusKeyword: initialData.focusKeyword || '',
+          secondaryKeywords: initialData.secondaryKeywords.join(', '),
           publicCategoryName: initialData.publicCategoryName || initialData.categoryId,
           publicCategorySlug: initialData.publicCategorySlug || normalizePublicCategorySlug(initialData.publicCategoryName || initialData.categoryId),
           description: initialData.description || '',
@@ -145,6 +153,10 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
           publicCategorySlug: '',
           shortDescription: '',
           description: '',
+          seoTitle: '',
+          seoDescription: '',
+          focusKeyword: '',
+          secondaryKeywords: '',
           images: '',
           tags: '',
           sku: '',
@@ -267,6 +279,12 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
         publicCategorySlug: normalizePublicCategorySlug(data.publicCategoryName),
         shortDescription: data.shortDescription.trim(),
         description: data.description?.trim() || '',
+        seoTitle: data.seoTitle?.trim() || data.name.trim(),
+        seoDescription: data.seoDescription?.trim() || data.shortDescription.trim(),
+        focusKeyword: data.focusKeyword?.trim() || '',
+        secondaryKeywords: data.secondaryKeywords
+          ? data.secondaryKeywords.split(',').map((keyword: string) => keyword.trim()).filter(Boolean)
+          : [],
         images: toImageList(data.images),
         tags: data.tags ? data.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [],
         sku: data.sku.trim(),
@@ -410,6 +428,46 @@ export default function ProductForm({ initialData, onSubmit }: ProductFormProps)
             />
           ) : null}
           <Input label="Remark" {...register('remark')} error={errors.remark?.message} className="lg:col-span-2" />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm">
+        <div className="mb-5">
+          <h2 className="text-lg font-bold text-stone-900">SEO</h2>
+          <p className="mt-0.5 text-xs text-stone-500">These values power the product page SEO and the product JSON-LD schema on the detail page.</p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="SEO Title"
+            id="seoTitle"
+            placeholder="Custom product SEO title"
+            error={errors.seoTitle?.message}
+            {...register('seoTitle')}
+            className="sm:col-span-2"
+          />
+          <Textarea
+            label="SEO Description"
+            id="seoDescription"
+            placeholder="Short search-friendly description for this product"
+            error={errors.seoDescription?.message}
+            {...register('seoDescription')}
+            className="sm:col-span-2"
+          />
+          <Input
+            label="Focus Keyword"
+            id="focusKeyword"
+            placeholder="e.g. ceramide gel moisturizer"
+            error={errors.focusKeyword?.message}
+            {...register('focusKeyword')}
+          />
+          <Input
+            label="Secondary Keywords"
+            id="secondaryKeywords"
+            placeholder="comma-separated keyword phrases"
+            error={errors.secondaryKeywords?.message}
+            {...register('secondaryKeywords')}
+          />
         </div>
       </div>
 

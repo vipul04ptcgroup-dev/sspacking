@@ -32,6 +32,24 @@ const supportLinks = [
   { label: 'Shipping Policy', href: '/shipping' },
 ];
 
+const associatedBrands = [
+  {
+    name: 'The Future X',
+    href: 'https://thefuturex.in',
+    logo: '/Footer/tfx.jpeg',
+  },
+  {
+    name: 'Ilika',
+    href: 'https://ilika.in',
+    logo: '/Footer/ilika.webp',
+  },
+  {
+    name: 'PTC Gram',
+    href: 'https://ptcgram.com',
+    logo: '/Footer/ptc.jpeg',
+  },
+];
+
 const contactItems = [
   {
     icon: MapPin,
@@ -64,7 +82,7 @@ const mobileSections = [
 ];
 
 export default function Footer() {
-  const [openSection, setOpenSection] = useState<string | null>('quick-links');
+  const [openSection, setOpenSection] = useState<string | null>(null);
 
   const toggleSection = (section: string) => {
     setOpenSection((current) => (current === section ? null : section));
@@ -118,7 +136,13 @@ export default function Footer() {
             </div>
 
             <FooterLinkColumn title="Quick Links" links={quickLinks} />
-            <FooterLinkColumn title="Company" links={companyLinks} />
+            <div>
+              <FooterLinkColumn title="Company" links={companyLinks} />
+              <div className="mt-8">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.28em] text-white">Associated Brands</h3>
+                <AssociatedBrandsList className="mt-4" compact />
+              </div>
+            </div>
             <FooterLinkColumn title="Support" links={supportLinks} />
           </div>
 
@@ -184,6 +208,22 @@ export default function Footer() {
                   </ul>
                 )}
               </div>
+
+              <div className="border-b border-white/10">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('associated-brands')}
+                  className="flex w-full items-center justify-between py-4 text-left"
+                >
+                  <span className="text-sm font-semibold uppercase tracking-[0.22em] text-white">Associated Brands</span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-stone-300 transition-transform ${
+                      openSection === 'associated-brands' ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                {openSection === 'associated-brands' && <AssociatedBrandsList className="pb-4" />}
+              </div>
             </div>
           </div>
 
@@ -200,6 +240,56 @@ export default function Footer() {
         </div>
       </div>
     </footer>
+  );
+}
+
+function AssociatedBrandsList({
+  className = '',
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
+  return (
+    <ul className={`${compact ? 'flex flex-wrap gap-3' : 'space-y-3'} ${className}`.trim()}>
+      {associatedBrands.map((brand) => (
+        <li key={brand.href}>
+          <a
+            href={brand.href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={brand.name}
+            className={
+              compact
+                ? 'flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white p-1 transition hover:border-amber-400/50 hover:bg-stone-100'
+                : 'flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 transition hover:border-amber-400/40 hover:bg-white/[0.06]'
+            }
+          >
+            <div
+              className={
+                compact
+                  ? 'flex h-full w-full items-center justify-center overflow-hidden'
+                  : 'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white px-2 py-1'
+              }
+            >
+              <Image
+                src={brand.logo}
+                alt={brand.name}
+                width={48}
+                height={48}
+                className="h-full w-full object-contain"
+              />
+            </div>
+            {!compact && (
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white">{brand.name}</p>
+                <p className="text-xs text-stone-400">{brand.href.replace(/^https?:\/\//, '')}</p>
+              </div>
+            )}
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }
 

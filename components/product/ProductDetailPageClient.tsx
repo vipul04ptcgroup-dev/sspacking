@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { MessageSquare, Package } from 'lucide-react';
@@ -8,6 +8,7 @@ import type { ClientProduct } from '@/lib/client-serialization';
 import { resolveProductPublicCategory } from '@/lib/public-product-categories';
 import { formatMeasurementValue, getProductUnitLabel } from '@/lib/product-units';
 import { formatPrice } from '@/lib/utils';
+import { trackVisitorEvent } from '@/lib/visitor-analytics-client';
 
 type DescriptionBlock =
   | { type: 'paragraph'; content: string }
@@ -79,6 +80,16 @@ export default function ProductDetailPageClient({
     ['Height', product.height],
   ].filter(([, value]) => value);
 
+  useEffect(() => {
+    trackVisitorEvent({
+      eventType: 'product_view',
+      productId: product.id,
+      productName: product.name,
+      pageUrl: typeof window !== 'undefined' ? window.location.href : productUrl,
+      price: startingPrice,
+    });
+  }, [product.id, product.name, productUrl, startingPrice]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="grid gap-12 lg:grid-cols-2">
@@ -134,7 +145,7 @@ export default function ProductDetailPageClient({
           </div>
 
           {quickAttributes.length > 0 ? (
-            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-6 grid grid-cols-3 gap-3">
               {quickAttributes.map(([label, value]) => (
                 <div
                   key={label}

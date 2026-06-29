@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import ScrollToTop from '@/components/layout/ScrollToTop';
+import VisitorAnalyticsTracker from '@/components/analytics/VisitorAnalyticsTracker';
 import { SITE_URL } from '@/lib/seo';
 import { BUSINESS_IMAGES, buildOrganizationSchema } from '@/src/seo/organizationSchema';
 import { buildWebsiteSchema } from '@/src/seo/websiteSchema';
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <AuthProvider>
           <ScrollToTop />
+          <VisitorAnalyticsTracker />
           <Navbar />
           <main className="min-h-screen">{children}</main>
           <ConditionalFooter />

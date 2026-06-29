@@ -10,6 +10,7 @@ import { useAuth } from '@/context/auth-context';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import toast from 'react-hot-toast';
+import { trackVisitorEvent } from '@/lib/visitor-analytics-client';
 
 const schema = z.object({
   email: z.string().email('Valid email required'),
@@ -32,6 +33,7 @@ function LoginContent() {
     setLoading(true);
     try {
       await login(data.email, data.password);
+      trackVisitorEvent({ eventType: 'login' });
       router.push(redirect);
     } catch {
       toast.error('Invalid email or password');
@@ -42,6 +44,7 @@ function LoginContent() {
     setGoogleLoading(true);
     try {
       await loginWithGoogle();
+      trackVisitorEvent({ eventType: 'login' });
       router.push(redirect);
     } catch {
       toast.error('Google login failed');

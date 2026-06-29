@@ -28,6 +28,10 @@ export interface Product {
   publicCategorySlug: string;
   shortDescription: string;
   description: string;
+  seoTitle: string;
+  seoDescription: string;
+  focusKeyword: string;
+  secondaryKeywords: string[];
   images: string[];
   tags: string[];
   sku: string;
@@ -227,6 +231,36 @@ export interface TeamAccessLog {
   createdAt: Date;
 }
 
+export type VisitorAnalyticsEventType =
+  | 'page_view'
+  | 'product_view'
+  | 'add_to_cart'
+  | 'checkout'
+  | 'login';
+
+export interface VisitorAnalyticsEvent {
+  id: string;
+  createdAt: Date;
+  eventType: VisitorAnalyticsEventType;
+  visitorId: string;
+  sessionId: string;
+  productId: string;
+  productName: string;
+  pageUrl: string;
+  quantity: number | null;
+  price: number | null;
+  device: string;
+  browser: string;
+  clientIp: string;
+  requestIp: string;
+  resolvedLocation: string;
+  locationSource: string;
+  country: string;
+  state: string;
+  city: string;
+  postalCode: string;
+}
+
 export interface QuoteRequest {
   id: string;
   name: string;
@@ -257,9 +291,14 @@ export interface BlogPost {
   content: string;
   coverImage: string;
   tags: string[];
+  order: number;
   published: boolean;
   featured: boolean;
   authorName: string;
+  focusKeyword: string;
+  secondaryKeywords: string[];
+  metaTitle: string;
+  metaDescription: string;
   seoTitle: string;
   seoDescription: string;
   internalLinks: BlogInternalLink[];

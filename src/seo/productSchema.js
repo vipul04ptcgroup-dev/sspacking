@@ -24,7 +24,16 @@ export function buildProductSchema({ path, product, category, aggregateRating })
     .filter((price) => Number.isFinite(price));
   const lowPrice = prices.length > 0 ? Math.min(...prices) : null;
   const highPrice = prices.length > 0 ? Math.max(...prices) : null;
-  const description = toPlainText(product.shortDescription || product.description);
+  const description = toPlainText(product.seoDescription || product.shortDescription || product.description);
+  const keywords = dedupeStrings([
+    product.focusKeyword,
+    ...(product.secondaryKeywords || []),
+    ...(product.tags || []),
+    product.material,
+    product.color,
+    product.capacity,
+    category?.name,
+  ]).join(', ');
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -35,13 +44,7 @@ export function buildProductSchema({ path, product, category, aggregateRating })
     image: images,
     sku: product.sku || undefined,
     category: category?.name || product.publicCategoryName || product.categoryId || undefined,
-    keywords: dedupeStrings([
-      ...(product.tags || []),
-      product.material,
-      product.color,
-      product.capacity,
-      category?.name,
-    ]).join(', ') || undefined,
+    keywords: keywords || undefined,
     brand: {
       '@type': 'Brand',
       name: SITE_NAME,
@@ -70,9 +73,10 @@ export function buildProductSchema({ path, product, category, aggregateRating })
               '@type': 'Offer',
               url,
               priceCurrency: 'INR',
-              price: lowPrice,
+              price: String(lowPrice),
               availability:
                 AVAILABILITY_MAP[product.stockStatus] || 'https://schema.org/InStock',
+              itemCondition: 'https://schema.org/NewCondition',
               seller: {
                 '@id': buildSchemaId('/', 'organization'),
               },

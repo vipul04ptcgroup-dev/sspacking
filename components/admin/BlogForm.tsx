@@ -43,9 +43,14 @@ export default function BlogForm({ initialData, onSubmit }: BlogFormProps) {
     content: initialData?.content || '',
     coverImage: initialData?.coverImage || '',
     tags: initialData?.tags || [],
+    order: initialData?.order ?? 0,
     published: initialData?.published || false,
     featured: initialData?.featured || false,
     authorName: initialData?.authorName || 'SS Packaging',
+    focusKeyword: initialData?.focusKeyword || '',
+    secondaryKeywords: initialData?.secondaryKeywords || [],
+    metaTitle: initialData?.metaTitle || initialData?.seoTitle || '',
+    metaDescription: initialData?.metaDescription || initialData?.seoDescription || '',
     seoTitle: initialData?.seoTitle || '',
     seoDescription: initialData?.seoDescription || '',
     internalLinks: initialData?.internalLinks || [],
@@ -53,6 +58,7 @@ export default function BlogForm({ initialData, onSubmit }: BlogFormProps) {
     publishedAt: initialData?.publishedAt || null,
   });
   const [tagsInput, setTagsInput] = useState((initialData?.tags || []).join(', '));
+  const [secondaryKeywordsInput, setSecondaryKeywordsInput] = useState((initialData?.secondaryKeywords || []).join(', '));
 
   useEffect(() => {
     if (slugTouched) return;
@@ -112,6 +118,14 @@ export default function BlogForm({ initialData, onSubmit }: BlogFormProps) {
         .split(',')
         .map((tag) => tag.trim())
         .filter(Boolean),
+      focusKeyword: form.focusKeyword.trim(),
+      secondaryKeywords: secondaryKeywordsInput
+        .split(',')
+        .map((keyword) => keyword.trim())
+        .filter(Boolean),
+      order: Number.isFinite(form.order) ? Math.max(0, Math.trunc(form.order)) : 0,
+      metaTitle: form.metaTitle.trim() || form.seoTitle.trim() || form.title.trim(),
+      metaDescription: form.metaDescription.trim() || form.seoDescription.trim() || form.excerpt.trim(),
       seoTitle: form.seoTitle.trim() || form.title.trim(),
       seoDescription: form.seoDescription.trim() || form.excerpt.trim(),
       internalLinks: form.internalLinks
@@ -210,6 +224,20 @@ export default function BlogForm({ initialData, onSubmit }: BlogFormProps) {
 
         <div className="grid gap-5 md:grid-cols-2">
           <Input
+            id="blog-order"
+            label="Display Order"
+            type="number"
+            min={0}
+            value={String(form.order ?? 0)}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                order: Math.max(0, Number.parseInt(event.target.value || '0', 10) || 0),
+              }))
+            }
+            helpText="Lower numbers appear first in blog lists."
+          />
+          <Input
             id="blog-author"
             label="Author Name"
             value={form.authorName}
@@ -251,22 +279,77 @@ export default function BlogForm({ initialData, onSubmit }: BlogFormProps) {
       <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
         <div className="mb-5">
           <h2 className="text-lg font-bold text-stone-900">SEO</h2>
-          <p className="mt-1 text-sm text-stone-500">Override the page title and description used for search and sharing.</p>
+          <p className="mt-1 text-sm text-stone-500">Meta and SEO values stay synced and are stored together for the blog JSON and public metadata.</p>
         </div>
 
         <div className="grid gap-5">
           <Input
+            id="blog-focus-keyword"
+            label="Focus Keyword"
+            value={form.focusKeyword}
+            onChange={(event) => setForm((current) => ({ ...current, focusKeyword: event.target.value }))}
+            placeholder="cosmetic bottle manufacturer India"
+          />
+          <div className="flex flex-col gap-1">
+            <Textarea
+              id="blog-secondary-keywords"
+              label="Secondary Keywords"
+              value={secondaryKeywordsInput}
+              onChange={(event) => setSecondaryKeywordsInput(event.target.value)}
+              placeholder="cosmetic packaging bottles wholesale, PET cosmetic bottles, custom cosmetic bottle supplier"
+            />
+            <p className="text-xs text-stone-500">Separate secondary keywords with commas.</p>
+          </div>
+          <Input
+            id="blog-meta-title"
+            label="Meta Title"
+            value={form.metaTitle}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                metaTitle: event.target.value,
+                seoTitle: event.target.value,
+              }))
+            }
+            placeholder="Defaults to the blog title"
+          />
+          <Textarea
+            id="blog-meta-description"
+            label="Meta Description"
+            value={form.metaDescription}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                metaDescription: event.target.value,
+                seoDescription: event.target.value,
+              }))
+            }
+            placeholder="Defaults to the excerpt"
+          />
+          <Input
             id="blog-seo-title"
             label="SEO Title"
             value={form.seoTitle}
-            onChange={(event) => setForm((current) => ({ ...current, seoTitle: event.target.value }))}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                seoTitle: event.target.value,
+                metaTitle: event.target.value,
+              }))
+            }
             placeholder="Defaults to the blog title"
           />
           <Textarea
             id="blog-seo-description"
             label="SEO Description"
             value={form.seoDescription}
-            onChange={(event) => setForm((current) => ({ ...current, seoDescription: event.target.value }))}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                seoDescription: event.target.value,
+                metaDescription: event.target.value,
+              }))
+            }
             placeholder="Defaults to the excerpt"
           />
         </div>

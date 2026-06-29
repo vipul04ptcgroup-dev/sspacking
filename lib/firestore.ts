@@ -316,6 +316,8 @@ function sanitizeProductWriteData(data: Partial<Product>) {
     : '';
   const resolvedUnit = sanitizedCategoryId ? getProductUnitForCategory(sanitizedCategoryId) : undefined;
   const bottleWeightGram = sanitizeBottleWeightGram(data.bottle_weight_gram);
+  const seoTitle = typeof data.seoTitle === 'string' ? sanitizeOptionalText(data.seoTitle) : '';
+  const seoDescription = typeof data.seoDescription === 'string' ? sanitizeLongText(data.seoDescription) : '';
 
   return {
     ...(typeof data.name === 'string' ? { name: sanitizeOptionalText(data.name) } : {}),
@@ -330,6 +332,16 @@ function sanitizeProductWriteData(data: Partial<Product>) {
     ...(resolvedUnit ? { unit: resolvedUnit } : {}),
     ...(typeof data.shortDescription === 'string' ? { shortDescription: sanitizeOptionalText(data.shortDescription) } : {}),
     ...(typeof data.description === 'string' ? { description: sanitizeOptionalText(data.description) } : {}),
+    ...(typeof data.seoTitle === 'string' ? { seoTitle } : {}),
+    ...(typeof data.seoDescription === 'string' ? { seoDescription } : {}),
+    ...(typeof data.focusKeyword === 'string' ? { focusKeyword: sanitizeOptionalText(data.focusKeyword) } : {}),
+    ...(Array.isArray(data.secondaryKeywords)
+      ? {
+          secondaryKeywords: data.secondaryKeywords
+            .filter((keyword) => typeof keyword === 'string' && keyword.trim().length > 0)
+            .map((keyword) => keyword.trim()),
+        }
+      : {}),
     ...(Array.isArray(data.images) ? { images: data.images.filter((image) => typeof image === 'string' && image.trim().length > 0).map((image) => image.trim()) } : {}),
     ...(Array.isArray(data.tags) ? { tags: data.tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0).map((tag) => tag.trim()) } : {}),
     ...(typeof data.sku === 'string' ? { sku: sanitizeOptionalText(data.sku) } : {}),
@@ -386,6 +398,10 @@ function normalizeProduct(id: string, data: Record<string, unknown>): Product {
     publicCategorySlug,
     shortDescription: sanitizeOptionalText(data.shortDescription),
     description: sanitizeOptionalText(data.description) || sanitizeOptionalText(data.shortDescription),
+    seoTitle: sanitizeOptionalText(data.seoTitle) || sanitizeOptionalText(data.name),
+    seoDescription: sanitizeLongText(data.seoDescription) || sanitizeOptionalText(data.shortDescription) || sanitizeOptionalText(data.description),
+    focusKeyword: sanitizeOptionalText(data.focusKeyword),
+    secondaryKeywords: Array.isArray(data.secondaryKeywords) ? (data.secondaryKeywords as string[]).filter(Boolean) : [],
     images: images.length > 0 ? images : migratedVariantImages,
     tags: Array.isArray(data.tags) ? (data.tags as string[]).filter(Boolean) : [],
     sku: sanitizeOptionalText(data.sku) || sanitizeOptionalText(firstVariant.sku),
@@ -607,6 +623,15 @@ function normalizeBlogInternalLinks(value: unknown): BlogInternalLink[] {
 function sanitizeBlogWriteData(data: Partial<BlogPost>) {
   const title = typeof data.title === 'string' ? sanitizeOptionalText(data.title) : '';
   const excerpt = typeof data.excerpt === 'string' ? sanitizeLongText(data.excerpt) : '';
+  const metaTitle = typeof data.metaTitle === 'string' ? sanitizeOptionalText(data.metaTitle) : '';
+  const metaDescription = typeof data.metaDescription === 'string' ? sanitizeLongText(data.metaDescription) : '';
+  const seoTitle = typeof data.seoTitle === 'string' ? sanitizeOptionalText(data.seoTitle) : '';
+  const seoDescription = typeof data.seoDescription === 'string' ? sanitizeLongText(data.seoDescription) : '';
+  const focusKeyword = typeof data.focusKeyword === 'string' ? sanitizeOptionalText(data.focusKeyword) : '';
+  const resolvedMetaTitle = metaTitle || seoTitle || title;
+  const resolvedMetaDescription = metaDescription || seoDescription || excerpt;
+  const resolvedSeoTitle = seoTitle || metaTitle || title;
+  const resolvedSeoDescription = seoDescription || metaDescription || excerpt;
 
   return {
     ...(title ? { title } : {}),
@@ -626,11 +651,27 @@ function sanitizeBlogWriteData(data: Partial<BlogPost>) {
             .filter(Boolean),
         }
       : {}),
+    ...(typeof data.focusKeyword === 'string' ? { focusKeyword } : {}),
+    ...(Array.isArray(data.secondaryKeywords)
+      ? {
+          secondaryKeywords: data.secondaryKeywords
+            .filter((keyword) => typeof keyword === 'string')
+            .map((keyword) => sanitizeOptionalText(keyword))
+            .filter(Boolean),
+        }
+      : {}),
+    ...(typeof data.order === 'number' && Number.isFinite(data.order)
+      ? { order: Math.max(0, Math.trunc(data.order)) }
+      : {}),
     ...(typeof data.published === 'boolean' ? { published: data.published } : {}),
     ...(typeof data.featured === 'boolean' ? { featured: data.featured } : {}),
     ...(typeof data.authorName === 'string' ? { authorName: sanitizeOptionalText(data.authorName) } : {}),
-    ...(typeof data.seoTitle === 'string' ? { seoTitle: sanitizeOptionalText(data.seoTitle) } : {}),
-    ...(typeof data.seoDescription === 'string' ? { seoDescription: sanitizeLongText(data.seoDescription) } : {}),
+    ...(typeof data.metaTitle === 'string' || typeof data.seoTitle === 'string'
+      ? { metaTitle: resolvedMetaTitle, seoTitle: resolvedSeoTitle }
+      : {}),
+    ...(typeof data.metaDescription === 'string' || typeof data.seoDescription === 'string'
+      ? { metaDescription: resolvedMetaDescription, seoDescription: resolvedSeoDescription }
+      : {}),
     ...(Array.isArray(data.internalLinks) ? { internalLinks: normalizeBlogInternalLinks(data.internalLinks) } : {}),
     ...(typeof data.createdBy === 'string' ? { createdBy: sanitizeOptionalText(data.createdBy) } : {}),
     ...('publishedAt' in data
@@ -644,6 +685,8 @@ function sanitizeBlogWriteData(data: Partial<BlogPost>) {
 function normalizeBlogPost(id: string, data: Record<string, unknown>): BlogPost {
   const title = sanitizeOptionalText(data.title);
   const excerpt = sanitizeLongText(data.excerpt);
+  const metaTitle = sanitizeOptionalText(data.metaTitle) || sanitizeOptionalText(data.seoTitle) || title;
+  const metaDescription = sanitizeLongText(data.metaDescription) || sanitizeLongText(data.seoDescription) || excerpt;
 
   return {
     id,
@@ -653,11 +696,18 @@ function normalizeBlogPost(id: string, data: Record<string, unknown>): BlogPost 
     content: sanitizeLongText(data.content),
     coverImage: sanitizeOptionalText(data.coverImage),
     tags: Array.isArray(data.tags) ? (data.tags as string[]).map((tag) => sanitizeOptionalText(tag)).filter(Boolean) : [],
+    focusKeyword: sanitizeOptionalText(data.focusKeyword),
+    secondaryKeywords: Array.isArray(data.secondaryKeywords)
+      ? (data.secondaryKeywords as string[]).map((keyword) => sanitizeOptionalText(keyword)).filter(Boolean)
+      : [],
+    order: typeof data.order === 'number' && Number.isFinite(data.order) ? Math.max(0, Math.trunc(data.order)) : 0,
     published: Boolean(data.published),
     featured: Boolean(data.featured),
     authorName: sanitizeOptionalText(data.authorName) || 'SS Packaging',
-    seoTitle: sanitizeOptionalText(data.seoTitle) || title,
-    seoDescription: sanitizeLongText(data.seoDescription) || excerpt,
+    metaTitle,
+    metaDescription,
+    seoTitle: sanitizeOptionalText(data.seoTitle) || metaTitle,
+    seoDescription: sanitizeLongText(data.seoDescription) || metaDescription,
     internalLinks: normalizeBlogInternalLinks(data.internalLinks),
     createdBy: sanitizeOptionalText(data.createdBy),
     createdAt: toDateOrNow(data.createdAt),
@@ -3171,6 +3221,7 @@ export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
     .map((docSnap) => normalizeBlogPost(docSnap.id, docSnap.data()))
     .filter((post) => post.published)
     .sort((left, right) => {
+      if (left.order !== right.order) return left.order - right.order;
       const leftTime = (left.publishedAt || left.createdAt).getTime();
       const rightTime = (right.publishedAt || right.createdAt).getTime();
       return rightTime - leftTime;
@@ -3188,6 +3239,7 @@ export async function getAllBlogPosts(): Promise<BlogPost[]> {
   return snap.docs
     .map((docSnap) => normalizeBlogPost(docSnap.id, docSnap.data()))
     .sort((left, right) => {
+      if (left.order !== right.order) return left.order - right.order;
       const leftTime = (left.publishedAt || left.createdAt).getTime();
       const rightTime = (right.publishedAt || right.createdAt).getTime();
       return rightTime - leftTime;
@@ -3224,11 +3276,16 @@ export async function createBlogPost(
     content: payload.content || '',
     coverImage: payload.coverImage || '',
     tags: payload.tags || [],
+    focusKeyword: payload.focusKeyword || '',
+    secondaryKeywords: payload.secondaryKeywords || [],
+    order: payload.order ?? 0,
     featured: payload.featured || false,
     published: payload.published || false,
     authorName: payload.authorName || 'SS Packaging',
-    seoTitle: payload.seoTitle || title,
-    seoDescription: payload.seoDescription || payload.excerpt || '',
+    metaTitle: payload.metaTitle || payload.seoTitle || title,
+    metaDescription: payload.metaDescription || payload.seoDescription || payload.excerpt || '',
+    seoTitle: payload.seoTitle || payload.metaTitle || title,
+    seoDescription: payload.seoDescription || payload.metaDescription || payload.excerpt || '',
     internalLinks: payload.internalLinks || [],
     createdBy: payload.createdBy || (typeof actor === 'string' ? actor : actor?.email || actor?.uid || 'admin'),
     publishedAt,
@@ -3246,6 +3303,8 @@ export async function createBlogPost(
     metadata: {
       slug: payload.slug || slugify(title),
       published: Boolean(payload.published),
+      order: payload.order ?? 0,
+      focusKeyword: payload.focusKeyword || '',
     },
   });
 
@@ -3279,6 +3338,7 @@ export async function updateBlogPost(
     metadata: {
       updatedFields: Object.keys(data).join(', ') || 'none',
       published: typeof data.published === 'boolean' ? data.published : existing?.published ?? false,
+      order: typeof data.order === 'number' ? data.order : existing?.order ?? 0,
     },
   });
 }

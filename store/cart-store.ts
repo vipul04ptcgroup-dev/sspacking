@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CartItem } from '@/types';
+import { trackVisitorEvent } from '@/lib/visitor-analytics-client';
 
 interface CartStore {
   items: CartItem[];
@@ -32,6 +33,14 @@ export const useCartStore = create<CartStore>()(
         } else {
           set(state => ({ items: [...state.items, item] }));
         }
+
+        trackVisitorEvent({
+          eventType: 'add_to_cart',
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        });
       },
 
       removeItem: (productId) => {

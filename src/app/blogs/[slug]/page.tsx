@@ -62,17 +62,18 @@ export async function generateMetadata({
   }
 
   const title = blog.seoTitle || blog.title;
-  const description = blog.seoDescription || blog.excerpt;
+  const description = blog.metaDescription || blog.seoDescription || blog.excerpt;
+  const resolvedTitle = blog.metaTitle || title;
   const path = `/blogs/${blog.slug}`;
 
   return {
-    title,
+    title: resolvedTitle,
     description,
     alternates: {
       canonical: absoluteUrl(path),
     },
     openGraph: {
-      title,
+      title: resolvedTitle,
       description,
       url: absoluteUrl(path),
       type: 'article',
@@ -80,7 +81,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: blog.coverImage ? 'summary_large_image' : 'summary',
-      title,
+      title: resolvedTitle,
       description,
       images: blog.coverImage ? [blog.coverImage] : undefined,
     },
@@ -105,6 +106,12 @@ export default async function BlogDetailPage({
     .slice(0, 3);
   const blocks = buildContentBlocks(blog.content);
   const pagePath = `/blogs/${blog.slug}`;
+  const keywordList = [
+    blog.focusKeyword,
+    ...blog.secondaryKeywords,
+    blog.title,
+    ...blog.tags,
+  ].filter(Boolean);
 
   return (
     <div className="bg-[linear-gradient(180deg,#ffffff_0%,#fafaf9_35%,#f5f5f4_100%)]">
@@ -112,14 +119,14 @@ export default async function BlogDetailPage({
         schemas={[
           buildWebPageSchema({
             path: pagePath,
-            name: blog.title,
-            description: blog.excerpt,
-            keywords: [blog.title, ...blog.tags],
+            name: blog.metaTitle || blog.seoTitle || blog.title,
+            description: blog.metaDescription || blog.seoDescription || blog.excerpt,
+            keywords: keywordList,
           }),
           buildArticleSchema({
             path: pagePath,
             headline: blog.title,
-            description: blog.excerpt,
+            description: blog.metaDescription || blog.seoDescription || blog.excerpt,
             image: blog.coverImage,
             datePublished: (blog.publishedAt || blog.createdAt).toISOString(),
             dateModified: blog.updatedAt.toISOString(),
@@ -149,14 +156,6 @@ export default async function BlogDetailPage({
                 Featured
               </span>
             ) : null}
-            {blog.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-600"
-              >
-                {tag}
-              </span>
-            ))}
           </div>
 
           <h1 className="mt-6 text-4xl font-black leading-tight text-stone-900 sm:text-5xl">
@@ -183,7 +182,7 @@ export default async function BlogDetailPage({
           </div>
         ) : null}
 
-        <div className="mx-auto mt-12 grid max-w-5xl gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="mx-auto mt-12 max-w-5xl">
           <div className="min-w-0 rounded-[2rem] border border-stone-200 bg-white p-7 shadow-sm sm:p-10">
             <div className="prose prose-stone max-w-none">
               {blocks.map((block, index) =>
@@ -201,40 +200,38 @@ export default async function BlogDetailPage({
               )}
             </div>
           </div>
-
-          <aside className="space-y-6">
-            {blog.internalLinks.length > 0 ? (
-              <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-stone-900">Internal Links</h2>
-                <div className="mt-5 space-y-3">
-                  {blog.internalLinks.map((link) => (
-                    <InternalBlogLink key={`${link.href}-${link.label}`} href={link.href} label={link.label} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {relatedBlogs.length > 0 ? (
-              <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-stone-900">More Articles</h2>
-                <div className="mt-5 space-y-4">
-                  {relatedBlogs.map((relatedBlog) => (
-                    <Link
-                      key={relatedBlog.id}
-                      href={`/blogs/${relatedBlog.slug}`}
-                      className="block rounded-2xl border border-stone-100 bg-stone-50 px-4 py-4 transition hover:border-amber-200 hover:bg-amber-50"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
-                        {formatDate(relatedBlog.publishedAt || relatedBlog.createdAt)}
-                      </p>
-                      <h3 className="mt-2 text-base font-bold leading-snug text-stone-900">{relatedBlog.title}</h3>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </aside>
         </div>
+
+        {blog.internalLinks.length > 0 ? (
+          <section className="mx-auto mt-10 max-w-5xl rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-stone-900">Internal Links</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {blog.internalLinks.map((link) => (
+                <InternalBlogLink key={`${link.href}-${link.label}`} href={link.href} label={link.label} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {relatedBlogs.length > 0 ? (
+          <section className="mx-auto mt-10 max-w-5xl rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-stone-900">More Articles</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {relatedBlogs.map((relatedBlog) => (
+                <Link
+                  key={relatedBlog.id}
+                  href={`/blogs/${relatedBlog.slug}`}
+                  className="block rounded-2xl border border-stone-100 bg-stone-50 px-4 py-4 transition hover:border-amber-200 hover:bg-amber-50"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                    {formatDate(relatedBlog.publishedAt || relatedBlog.createdAt)}
+                  </p>
+                  <h3 className="mt-2 text-base font-bold leading-snug text-stone-900">{relatedBlog.title}</h3>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </article>
     </div>
   );
