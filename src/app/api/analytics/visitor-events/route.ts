@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import {
+  getBlockedIpsFromEnv,
+  isBlockedAnalyticsIp,
   VISITOR_ANALYTICS_COLLECTION,
   VISITOR_ANALYTICS_EVENT_TYPES,
   normalizeCity,
@@ -37,6 +39,12 @@ export async function POST(request: Request) {
       || headers.get('cf-connecting-ip')
       || headers.get('x-vercel-forwarded-for'),
     );
+    const clientIp = normalizeIp(body.clientIp);
+    const blockedIps = getBlockedIpsFromEnv();
+
+    if (isBlockedAnalyticsIp(requestIp, blockedIps) || isBlockedAnalyticsIp(clientIp, blockedIps)) {
+      return NextResponse.json({ success: true, skipped: true });
+    }
 
     const headerLocation = resolveLocationFromHeaders(headers);
     const country = normalizeCountry(body.country || headerLocation.country);
@@ -59,7 +67,7 @@ export async function POST(request: Request) {
       price: typeof body.price === 'number' && Number.isFinite(body.price) ? body.price : null,
       device: body.device?.trim() || parsedAgent.device,
       browser: body.browser?.trim() || parsedAgent.browser,
-      clientIp: normalizeIp(body.clientIp),
+      clientIp,
       requestIp,
       resolvedLocation,
       locationSource,

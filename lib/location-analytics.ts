@@ -10,6 +10,8 @@ export const VISITOR_ANALYTICS_EVENT_TYPES: VisitorAnalyticsEventType[] = [
   'login',
 ];
 
+const STATIC_BLOCKED_IPS = ['160.25.128.68'];
+
 export type VisitorAnalyticsFilters = {
   dateFrom?: string;
   dateTo?: string;
@@ -258,11 +260,16 @@ export function isPrivateIp(ip: string): boolean {
 
 export function getBlockedIpsFromEnv(): Set<string> {
   return new Set(
-    (process.env.ANALYTICS_BLOCKED_IPS || '')
+    [...STATIC_BLOCKED_IPS, ...(process.env.ANALYTICS_BLOCKED_IPS || '')
       .split(',')
       .map((value) => normalizeIp(value))
-      .filter(Boolean),
+      .filter(Boolean)],
   );
+}
+
+export function isBlockedAnalyticsIp(ip: string, blockedIps = getBlockedIpsFromEnv()): boolean {
+  const normalizedIp = normalizeIp(ip);
+  return Boolean(normalizedIp) && blockedIps.has(normalizedIp);
 }
 
 export function shouldExcludeEventFromDisplay(event: VisitorAnalyticsEvent, blockedIps = getBlockedIpsFromEnv()): boolean {

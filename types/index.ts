@@ -4,6 +4,16 @@ export interface PricingTier {
   unitPrice: number;
 }
 
+export interface SuitableForItem {
+  name: string;
+  svgUrl: string;
+}
+
+export interface CompatibleClosureItem {
+  name: string;
+  imageUrl: string;
+}
+
 export type ProductUnit = 'kg' | 'gram';
 export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock';
 export type InventoryTransactionType = 'IN' | 'OUT';
@@ -32,6 +42,14 @@ export interface Product {
   seoDescription: string;
   focusKeyword: string;
   secondaryKeywords: string[];
+  compatibleClosuresImage: string;
+  compatibleClosures: CompatibleClosureItem[];
+  dimensionDiagramImage: string;
+  customizationImage: string;
+  scanner3dImage: string;
+  customizationOptions: string[];
+  applicationIndustries: string[];
+  suitableFor: SuitableForItem[];
   images: string[];
   tags: string[];
   sku: string;
@@ -43,10 +61,16 @@ export interface Product {
   capacity: string;
   neckSize: string;
   height: string;
+  width: string;
+  length: string;
   weight: string;
   material: string;
   packagingSize: string;
   color: string;
+  surfaceFinish: string;
+  suitableForText: string;
+  moq: string;
+  countryOfOrigin: string;
   remark: string;
   bottle_weight_gram?: number | null;
   pricingTiers: PricingTier[];

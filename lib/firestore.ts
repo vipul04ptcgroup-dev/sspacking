@@ -342,16 +342,68 @@ function sanitizeProductWriteData(data: Partial<Product>) {
             .map((keyword) => keyword.trim()),
         }
       : {}),
+    ...(typeof data.compatibleClosuresImage === 'string'
+      ? { compatibleClosuresImage: sanitizeOptionalText(data.compatibleClosuresImage) }
+      : {}),
+    ...(Array.isArray(data.compatibleClosures)
+      ? {
+          compatibleClosures: data.compatibleClosures
+            .map((item) => ({
+              name: sanitizeOptionalText(item?.name),
+              imageUrl: sanitizeOptionalText(item?.imageUrl),
+            }))
+            .filter((item) => item.name && item.imageUrl),
+        }
+      : {}),
+    ...(typeof data.dimensionDiagramImage === 'string'
+      ? { dimensionDiagramImage: sanitizeOptionalText(data.dimensionDiagramImage) }
+      : {}),
+    ...(typeof data.customizationImage === 'string'
+      ? { customizationImage: sanitizeOptionalText(data.customizationImage) }
+      : {}),
+    ...(typeof data.scanner3dImage === 'string'
+      ? { scanner3dImage: sanitizeOptionalText(data.scanner3dImage) }
+      : {}),
+    ...(Array.isArray(data.customizationOptions)
+      ? {
+          customizationOptions: data.customizationOptions
+            .filter((option) => typeof option === 'string' && option.trim().length > 0)
+            .map((option) => option.trim()),
+        }
+      : {}),
+    ...(Array.isArray(data.applicationIndustries)
+      ? {
+          applicationIndustries: data.applicationIndustries
+            .filter((industry) => typeof industry === 'string' && industry.trim().length > 0)
+            .map((industry) => industry.trim()),
+        }
+      : {}),
+    ...(Array.isArray(data.suitableFor)
+      ? {
+          suitableFor: data.suitableFor
+            .map((item) => ({
+              name: sanitizeOptionalText(item?.name),
+              svgUrl: sanitizeOptionalText(item?.svgUrl),
+            }))
+            .filter((item) => item.name && item.svgUrl),
+        }
+      : {}),
     ...(Array.isArray(data.images) ? { images: data.images.filter((image) => typeof image === 'string' && image.trim().length > 0).map((image) => image.trim()) } : {}),
     ...(Array.isArray(data.tags) ? { tags: data.tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0).map((tag) => tag.trim()) } : {}),
     ...(typeof data.sku === 'string' ? { sku: sanitizeOptionalText(data.sku) } : {}),
     ...(typeof data.capacity === 'string' ? { capacity: sanitizeOptionalText(data.capacity) } : {}),
     ...(typeof data.neckSize === 'string' ? { neckSize: sanitizeOptionalText(data.neckSize) } : {}),
     ...(typeof data.height === 'string' ? { height: sanitizeOptionalText(data.height) } : {}),
+    ...(typeof data.width === 'string' ? { width: sanitizeOptionalText(data.width) } : {}),
+    ...(typeof data.length === 'string' ? { length: sanitizeOptionalText(data.length) } : {}),
     ...(typeof data.weight === 'string' ? { weight: sanitizeOptionalText(data.weight) } : {}),
     ...(typeof data.material === 'string' ? { material: sanitizeOptionalText(data.material) } : {}),
     ...(typeof data.packagingSize === 'string' ? { packagingSize: sanitizeOptionalText(data.packagingSize) } : {}),
     ...(typeof data.color === 'string' ? { color: sanitizeOptionalText(data.color) } : {}),
+    ...(typeof data.surfaceFinish === 'string' ? { surfaceFinish: sanitizeOptionalText(data.surfaceFinish) } : {}),
+    ...(typeof data.suitableForText === 'string' ? { suitableForText: sanitizeOptionalText(data.suitableForText) } : {}),
+    ...(typeof data.moq === 'string' ? { moq: sanitizeOptionalText(data.moq) } : {}),
+    ...(typeof data.countryOfOrigin === 'string' ? { countryOfOrigin: sanitizeOptionalText(data.countryOfOrigin) } : {}),
     ...(typeof data.remark === 'string' ? { remark: sanitizeOptionalText(data.remark) } : {}),
     ...('bottle_weight_gram' in data && bottleWeightGram != null ? { bottle_weight_gram: bottleWeightGram } : {}),
     ...(Array.isArray(data.pricingTiers)
@@ -402,6 +454,32 @@ function normalizeProduct(id: string, data: Record<string, unknown>): Product {
     seoDescription: sanitizeLongText(data.seoDescription) || sanitizeOptionalText(data.shortDescription) || sanitizeOptionalText(data.description),
     focusKeyword: sanitizeOptionalText(data.focusKeyword),
     secondaryKeywords: Array.isArray(data.secondaryKeywords) ? (data.secondaryKeywords as string[]).filter(Boolean) : [],
+    compatibleClosuresImage: sanitizeOptionalText(data.compatibleClosuresImage),
+    compatibleClosures: Array.isArray(data.compatibleClosures)
+      ? (data.compatibleClosures as Product['compatibleClosures'])
+        .map((item) => ({
+          name: sanitizeOptionalText(item?.name),
+          imageUrl: sanitizeOptionalText(item?.imageUrl),
+        }))
+        .filter((item) => item.name && item.imageUrl)
+      : [],
+    dimensionDiagramImage: sanitizeOptionalText(data.dimensionDiagramImage),
+    customizationImage: sanitizeOptionalText(data.customizationImage),
+    scanner3dImage: sanitizeOptionalText(data.scanner3dImage),
+    customizationOptions: Array.isArray(data.customizationOptions)
+      ? (data.customizationOptions as string[]).map((option) => sanitizeOptionalText(option)).filter(Boolean)
+      : [],
+    applicationIndustries: Array.isArray(data.applicationIndustries)
+      ? (data.applicationIndustries as string[]).map((industry) => sanitizeOptionalText(industry)).filter(Boolean)
+      : [],
+    suitableFor: Array.isArray(data.suitableFor)
+      ? (data.suitableFor as Product['suitableFor'])
+        .map((item) => ({
+          name: sanitizeOptionalText(item?.name),
+          svgUrl: sanitizeOptionalText(item?.svgUrl),
+        }))
+        .filter((item) => item.name && item.svgUrl)
+      : [],
     images: images.length > 0 ? images : migratedVariantImages,
     tags: Array.isArray(data.tags) ? (data.tags as string[]).filter(Boolean) : [],
     sku: sanitizeOptionalText(data.sku) || sanitizeOptionalText(firstVariant.sku),
@@ -413,10 +491,16 @@ function normalizeProduct(id: string, data: Record<string, unknown>): Product {
     capacity: sanitizeOptionalText(data.capacity) || sanitizeOptionalText(firstVariant.capacity ?? firstVariant.size),
     neckSize: sanitizeOptionalText(data.neckSize) || sanitizeOptionalText(firstVariant.neckSize),
     height: sanitizeOptionalText(data.height) || sanitizeOptionalText(firstVariant.height),
+    width: sanitizeOptionalText(data.width) || sanitizeOptionalText(firstVariant.width),
+    length: sanitizeOptionalText(data.length) || sanitizeOptionalText(firstVariant.length),
     weight: sanitizeOptionalText(data.weight) || sanitizeOptionalText(firstVariant.weight),
     material: sanitizeOptionalText(data.material) || sanitizeOptionalText(firstVariant.material),
     packagingSize: sanitizeOptionalText(data.packagingSize) || sanitizeOptionalText(firstVariant.packagingSize),
     color: sanitizeOptionalText(data.color) || sanitizeOptionalText(firstVariant.color),
+    surfaceFinish: sanitizeOptionalText(data.surfaceFinish) || sanitizeOptionalText(firstVariant.surfaceFinish),
+    suitableForText: sanitizeOptionalText(data.suitableForText) || sanitizeOptionalText(firstVariant.suitableForText),
+    moq: sanitizeOptionalText(data.moq) || sanitizeOptionalText(firstVariant.moq),
+    countryOfOrigin: sanitizeOptionalText(data.countryOfOrigin) || sanitizeOptionalText(firstVariant.countryOfOrigin),
     remark: sanitizeOptionalText(data.remark) || sanitizeOptionalText(firstVariant.remark),
     bottle_weight_gram: bottleWeightGram,
     pricingTiers,
@@ -1092,10 +1176,16 @@ export async function backfillProductStockFields(): Promise<number> {
       capacity: normalizedProduct.capacity,
       neckSize: normalizedProduct.neckSize,
       height: normalizedProduct.height,
+      width: normalizedProduct.width,
+      length: normalizedProduct.length,
       weight: normalizedProduct.weight,
       material: normalizedProduct.material,
       packagingSize: normalizedProduct.packagingSize,
       color: normalizedProduct.color,
+      surfaceFinish: normalizedProduct.surfaceFinish,
+      suitableForText: normalizedProduct.suitableForText,
+      moq: normalizedProduct.moq,
+      countryOfOrigin: normalizedProduct.countryOfOrigin,
       remark: normalizedProduct.remark,
       ...(currentCategoryId === PRODUCTION_CATEGORY_SLUG && nextBottleWeightGram != null
         ? { bottle_weight_gram: nextBottleWeightGram }

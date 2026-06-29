@@ -107,6 +107,40 @@ function formatCurrency(value: number | null): string {
   }).format(value);
 }
 
+function getCountryCode(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === 'unknown') return '-';
+  if (normalized === 'india') return 'IN';
+  if (normalized === 'united states') return 'US';
+  if (normalized === 'united kingdom') return 'UK';
+  return value.length <= 3 ? value.toUpperCase() : value.slice(0, 2).toUpperCase();
+}
+
+function formatLocationHeadline(event: AnalyticsResponse['events'][number]): string {
+  const city = event.city && event.city !== 'Unknown' ? event.city : '';
+  const postalCode = event.postalCode || '';
+  const state = event.state && event.state !== 'Unknown' ? event.state : '';
+
+  if (city && postalCode) return `${city} - ${postalCode}`;
+  if (city) return city;
+  if (state && postalCode) return `${state} - ${postalCode}`;
+  if (postalCode) return postalCode;
+  if (state) return state;
+  return event.resolvedLocation || '-';
+}
+
+function formatClientLocation(event: AnalyticsResponse['events'][number]): string {
+  const city = event.city && event.city !== 'Unknown' ? event.city : '';
+  const postalCode = event.postalCode || '';
+  if (city && postalCode) return `${city} ${postalCode}`;
+  return city || postalCode || '-';
+}
+
+function formatLocationSource(source: string): string {
+  if (!source) return '-';
+  return source.replace(/-/g, ' ');
+}
+
 function buildDefaultFilters(): Filters {
   const { dateFrom, dateTo } = getDefaultAnalyticsDateRange();
   return {
@@ -508,8 +542,9 @@ export default function AdminLocationAnalyticsPage() {
                           <p className="mt-1 text-xs text-stone-500">{event.sessionId || '-'}</p>
                         </td>
                         <td className="px-5 py-4 text-sm text-stone-600">
-                          <p className="font-medium text-stone-900">{event.resolvedLocation || '-'}</p>
-                          <p className="mt-1 text-xs text-stone-500">{event.locationSource || '-'}</p>
+                          <p className="font-medium text-stone-900">{formatLocationHeadline(event)}</p>
+                          <p className="mt-1 text-xs text-stone-500">source: {formatLocationSource(event.locationSource)}</p>
+                          <p className="mt-1 text-xs text-stone-500">clientIp: {event.clientIp || event.requestIp || '-'}</p>
                         </td>
                         <td className="px-5 py-4 text-sm text-stone-600 break-all">{event.pageUrl || '-'}</td>
                         <td className="px-5 py-4 text-sm text-stone-600">
@@ -521,6 +556,8 @@ export default function AdminLocationAnalyticsPage() {
                         <td className="px-5 py-4 text-sm text-stone-600">
                           <p>{event.device || '-'}</p>
                           <p className="mt-1 text-xs text-stone-500">{event.browser || '-'}</p>
+                          <p className="mt-1 text-xs text-stone-500">header: {getCountryCode(event.country)}</p>
+                          <p className="mt-1 text-xs text-stone-500">client: {formatClientLocation(event)}</p>
                         </td>
                       </tr>
                     ))}
