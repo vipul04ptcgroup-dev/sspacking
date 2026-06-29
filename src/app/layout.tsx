@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { AuthProvider } from '@/context/auth-context';
 import { Toaster } from 'react-hot-toast';
@@ -51,7 +52,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <AuthProvider>
           <ScrollToTop />
-          <VisitorAnalyticsTracker />
+          <Suspense fallback={null}>
+            <VisitorAnalyticsTracker />
+          </Suspense>
           <Navbar />
           <main className="min-h-screen">{children}</main>
           <ConditionalFooter />
