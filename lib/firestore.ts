@@ -1,8 +1,9 @@
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, serverTimestamp, runTransaction, writeBatch, deleteField,
+  query, where, orderBy, limit, serverTimestamp, runTransaction, writeBatch, deleteField, setDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { HOMEPAGE_BANNER_SETTINGS_ID } from './homepage-banner-constants';
 import {
   CORE_PRODUCT_CATEGORY_SLUGS,
   PRODUCTION_CATEGORY_SLUG,
@@ -17,6 +18,7 @@ import type {
   Address,
   BlogInternalLink,
   BlogPost,
+  HomepageBannerSettings,
   Product,
   Category,
   Order,
@@ -970,6 +972,25 @@ function normalizeCategory(id: string, data: Record<string, unknown>): Category 
   };
 }
 
+function sanitizeHomepageBannerSettingsWriteData(data: Partial<HomepageBannerSettings>) {
+  return {
+    ...(typeof data.desktopBanner === 'string' ? { desktopBanner: sanitizeOptionalText(data.desktopBanner) } : {}),
+    ...(typeof data.mobileBanner === 'string' ? { mobileBanner: sanitizeOptionalText(data.mobileBanner) } : {}),
+  };
+}
+
+function normalizeHomepageBannerSettings(
+  id: string,
+  data: Record<string, unknown>,
+): HomepageBannerSettings {
+  return {
+    id,
+    desktopBanner: sanitizeOptionalText(data.desktopBanner),
+    mobileBanner: sanitizeOptionalText(data.mobileBanner),
+    updatedAt: toDateOrNull(data.updatedAt),
+  };
+}
+
 function assertManagedCategorySlug(slug: string): void {
   if (!isCoreProductCategorySlug(slug)) {
     throw new Error('Only raw-material, production, and finished categories are allowed.');
@@ -1071,6 +1092,39 @@ export async function deleteCategory(id: string, actor?: string | AdminActivityA
     entityLabel: categoryName,
     message: `Deleted category "${categoryName}"`,
     actor,
+  });
+}
+
+export async function getHomepageBannerSettings(): Promise<HomepageBannerSettings | null> {
+  const snap = await getDoc(doc(db, 'siteSettings', HOMEPAGE_BANNER_SETTINGS_ID));
+  if (!snap.exists()) return null;
+  return normalizeHomepageBannerSettings(snap.id, snap.data() as Record<string, unknown>);
+}
+
+export async function upsertHomepageBannerSettings(
+  data: Partial<HomepageBannerSettings>,
+  actor?: string | AdminActivityActor,
+): Promise<void> {
+  const payload = sanitizeHomepageBannerSettingsWriteData(data);
+
+  const settingsRef = doc(db, 'siteSettings', HOMEPAGE_BANNER_SETTINGS_ID);
+  await setDoc(settingsRef, {
+    ...payload,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+
+  await logAdminActivity({
+    action: 'update',
+    entity: 'homepage_settings',
+    entityId: HOMEPAGE_BANNER_SETTINGS_ID,
+    entityLabel: 'Homepage banners',
+    message: 'Updated homepage banner settings',
+    actor,
+    metadata: {
+      updatedFields: Object.keys(payload).join(', ') || 'none',
+      desktopBanner: Boolean(payload.desktopBanner),
+      mobileBanner: Boolean(payload.mobileBanner),
+    },
   });
 }
 

@@ -91,6 +91,13 @@ export interface Category {
   active: boolean;
 }
 
+export interface HomepageBannerSettings {
+  id: string;
+  desktopBanner: string;
+  mobileBanner: string;
+  updatedAt?: Date | null;
+}
+
 export interface CartItem {
   productId: string;
   productName: string;
@@ -409,6 +416,7 @@ export type AdminActivityEntity =
   | 'product'
   | 'category'
   | 'blog'
+  | 'homepage_settings'
   | 'order'
   | 'inventory'
   | 'supplier'

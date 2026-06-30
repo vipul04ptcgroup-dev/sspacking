@@ -22,6 +22,14 @@ export async function uploadBlogImage(file: File, blogId: string): Promise<strin
   return uploadImage(file, `blogs/${blogId}/${filename}`);
 }
 
+export async function uploadHomepageBannerImage(
+  file: File,
+  bannerType: 'desktop' | 'mobile',
+): Promise<string> {
+  const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  return uploadImage(file, `homepage-banners/${bannerType}/${filename}`);
+}
+
 export async function uploadDeliveryChallanImage(
   file: File,
   challanRef: string,

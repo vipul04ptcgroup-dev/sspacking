@@ -7,6 +7,7 @@ import CategoryGrid from '@/components/home/CategoryGrid';
 import FullWidthCTA from '@/components/home/FullWidthCTA';
 import ProcessAboutSection from '@/components/home/ProcessAboutSection';
 import ClientTrustSection from '@/components/home/ClientTrustSection';
+import { getHomepageBannerSettingsServer } from '@/lib/homepage-banner-settings';
 import { buildMetadata, SITE_DESCRIPTION } from '@/lib/seo';
 import { buildWebPageSchema } from '@/src/seo/webpageSchema';
 import { SchemaInjector } from '@/src/seo/schemaInjector';
@@ -20,7 +21,9 @@ export const metadata: Metadata = buildMetadata({
   keywords: ['SS Packaging', 'packaging products', 'eco-friendly packaging', 'India packaging supplier'],
 });
 
-export default function HomePage() {
+export default async function HomePage() {
+  const homepageBanners = await getHomepageBannerSettingsServer();
+
   return (
     <>
       {/* Homepage WebPage schema for the main marketing landing page. */}
@@ -36,7 +39,7 @@ export default function HomePage() {
       />
       <section className="relative">
         <Image
-          src="/banner.png"
+          src={homepageBanners.desktopBanner}
           alt="SS Packaging banner"
           width={1600}
           height={700}
@@ -44,7 +47,7 @@ export default function HomePage() {
           className="hidden w-full h-auto md:block"
         />
         <Image
-          src="/bannermobile.png"
+          src={homepageBanners.mobileBanner}
           alt="SS Packaging banner"
           width={900}
           height={1200}
