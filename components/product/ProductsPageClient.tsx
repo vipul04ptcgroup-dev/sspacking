@@ -135,27 +135,31 @@ function ProductsContent({
           <SlidersHorizontal className="w-4 h-4" /> Filters
         </button>
 
-        <button
-          onClick={() => setSelectedCategory('')}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${!selectedCategory ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
-        >
-          All
-        </button>
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.slug === selectedCategory ? '' : cat.slug)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${selectedCategory === cat.slug ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
-          >
-            {cat.name}
-          </button>
-        ))}
-        <button
-          onClick={() => setSelectedCategory(selectedCategory === OTHER_CATEGORY_KEY ? '' : OTHER_CATEGORY_KEY)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${selectedCategory === OTHER_CATEGORY_KEY ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
-        >
-          Others
-        </button>
+        {showFilters && (
+          <>
+            <button
+              onClick={() => setSelectedCategory('')}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${!selectedCategory ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
+            >
+              All
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.slug === selectedCategory ? '' : cat.slug)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${selectedCategory === cat.slug ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
+              >
+                {cat.name}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedCategory(selectedCategory === OTHER_CATEGORY_KEY ? '' : OTHER_CATEGORY_KEY)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${selectedCategory === OTHER_CATEGORY_KEY ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-amber-50'}`}
+            >
+              Others
+            </button>
+          </>
+        )}
 
         <div className="ml-auto">
           <select
